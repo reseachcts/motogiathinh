@@ -12,7 +12,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
@@ -80,6 +80,9 @@ class Student(BaseModel):
     payment_plans: Mapped[list["PaymentPlan"]] = relationship(
         "PaymentPlan", back_populates="student"
     )
+    contacts: Mapped[list["StudentContact"]] = relationship(
+        "StudentContact", back_populates="student"
+    )
     documents: Mapped[list["StudentDocument"]] = relationship(
         "StudentDocument", back_populates="student"
     )
@@ -92,6 +95,21 @@ class Student(BaseModel):
     exam_registrations: Mapped[list["ExamRegistration"]] = relationship(
         "ExamRegistration", back_populates="student"
     )
+
+
+class StudentContact(BaseModel):
+    __tablename__ = "student_contacts"
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(100))
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    relation: Mapped[str | None] = mapped_column(String(50))  # cha, mẹ, vợ, chồng, etc.
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    student = relationship("Student", back_populates="contacts")
 
 
 class StudentHealthCheck(BaseModel):
@@ -139,7 +157,7 @@ class StudentDocument(BaseModel):
     )
     file_url: Mapped[str] = mapped_column(String(500), nullable=False)
     expiry_date: Mapped[date | None] = mapped_column(Date)
-    ocr_raw_data: Mapped[dict | None] = mapped_column()
+    ocr_raw_data: Mapped[dict | None] = mapped_column(JSONB)
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     student: Mapped["Student"] = relationship("Student", back_populates="documents")

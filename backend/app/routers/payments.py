@@ -63,12 +63,15 @@ async def overdue_payments(
     return await PaymentService(db, current_user).get_overdue_plans(effective_branch)
 
 
-@router.post("/plans/{plan_id}/waive", response_model=PaymentPlanOut)
+@router.post(
+    "/plans/{plan_id}/waive",
+    response_model=PaymentPlanOut,
+    dependencies=[Depends(require_role(RoleName.admin))],
+)
 async def waive_payment(
     plan_id: uuid.UUID,
     current_user: CurrentUser,
     db: DB,
     reason: str = Query(""),
-    _: CurrentUser = Depends(require_role(RoleName.admin)),
 ):
     return await PaymentService(db, current_user).waive_payment(plan_id, reason)

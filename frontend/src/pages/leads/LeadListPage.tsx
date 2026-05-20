@@ -69,13 +69,13 @@ const LeadListPage: React.FC = () => {
       title: 'Họ tên',
       dataIndex: 'ho_ten',
       key: 'ho_ten',
-      render: (v: string) => <Text style={{ color: '#f0f6fc', fontWeight: 600 }}>{v ?? '—'}</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-primary)', fontWeight: 600 }}>{v ?? '—'}</Text>,
     },
     {
       title: 'SĐT',
       dataIndex: 'so_dien_thoai',
       key: 'so_dien_thoai',
-      render: (v: string) => <Text style={{ color: '#8b949e' }}>{v ?? '—'}</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-secondary)' }}>{v ?? '—'}</Text>,
     },
     {
       title: 'Nguồn',
@@ -87,7 +87,7 @@ const LeadListPage: React.FC = () => {
       title: 'Quảng cáo',
       dataIndex: 'ad_name',
       key: 'ad_name',
-      render: (v: string) => <Text style={{ color: '#8b949e', fontSize: 12 }}>{v ?? '—'}</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>{v ?? '—'}</Text>,
     },
     {
       title: 'Trạng thái',
@@ -99,13 +99,13 @@ const LeadListPage: React.FC = () => {
       title: 'Nhận bởi',
       dataIndex: 'assigned_to',
       key: 'assigned_to',
-      render: (v: string | null) => v ? <Text style={{ color: '#8b949e', fontSize: 12 }}>Đã nhận</Text> : <Tag color="gold">Chưa nhận</Tag>,
+      render: (v: string | null) => v ? <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>Đã nhận</Text> : <Tag color="gold">Chưa nhận</Tag>,
     },
     {
       title: 'Ngày vào',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: (v: string) => <Text style={{ color: '#8b949e', fontSize: 12 }}>{dayjs(v).format('DD/MM/YY HH:mm')}</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>{dayjs(v).format('DD/MM/YY HH:mm')}</Text>,
     },
     {
       title: '',
@@ -114,13 +114,13 @@ const LeadListPage: React.FC = () => {
         <Space>
           {!row.assigned_to && (
             <Button size="small" onClick={() => assignMutation.mutate(row.id)}
-              style={{ background: '#1d2a3a', borderColor: '#1677ff30', color: '#4096ff', fontSize: 12 }}>
+              style={{ background: 'var(--mgt-tag-blue-bg)', borderColor: 'var(--mgt-tag-blue-border)', color: 'var(--mgt-tag-blue-text)', fontSize: 12 }}>
               Nhận
             </Button>
           )}
           {!row.converted_to && (
             <Button size="small" icon={<UserAddOutlined />} onClick={() => setConvertLead(row)}
-              style={{ background: '#12261e', borderColor: '#52c41a30', color: '#52c41a', fontSize: 12 }}>
+              style={{ background: 'var(--mgt-tag-green-bg)', borderColor: 'var(--mgt-tag-green-border)', color: 'var(--mgt-tag-green-text)', fontSize: 12 }}>
               Chuyển thành HV
             </Button>
           )}
@@ -130,15 +130,15 @@ const LeadListPage: React.FC = () => {
   ]
 
   return (
-    <div style={{ padding: '24px 32px', fontFamily: "'Barlow', sans-serif" }}>
+    <div style={{ padding: '16px clamp(16px, 3vw, 32px)', fontFamily: "'Barlow', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <Title level={3} style={{ margin: 0, color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
+          <Title level={3} style={{ margin: 0, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
             QUẢN LÝ LEAD
           </Title>
-          <Text style={{ color: '#8b949e', fontSize: 13 }}>
+          <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 13 }}>
             {(unclaimedData?.count ?? 0) > 0 && (
               <Badge count={unclaimedData?.count} style={{ backgroundColor: '#f5a623', marginRight: 8 }} />
             )}
@@ -149,21 +149,22 @@ const LeadListPage: React.FC = () => {
           <Button
             type={unclaimedOnly ? 'primary' : 'default'}
             onClick={() => setUnclaimedOnly(!unclaimedOnly)}
-            style={unclaimedOnly ? {} : { background: '#161b22', border: '1px solid #30363d', color: '#f0f6fc' }}
+            style={unclaimedOnly ? {} : { background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)' }}
           >
             Chỉ chưa nhận
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e' }} />
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-secondary)' }} />
         </Space>
       </div>
 
-      <div style={{ background: 'linear-gradient(135deg, #0d1117, #161b22)', border: '1px solid #21262d', borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 16, overflow: 'hidden' }}>
         <Table
           dataSource={leads ?? []}
           columns={columns}
           loading={isLoading}
           rowKey="id"
           size="middle"
+          scroll={{ x: 800 }}
           pagination={{ pageSize: 30 }}
         />
       </div>
@@ -171,23 +172,23 @@ const LeadListPage: React.FC = () => {
       {/* Convert modal */}
       <Modal
         open={!!convertLead}
-        title={<span style={{ color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18 }}>Chuyển Lead thành Học viên</span>}
+        title={<span style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18 }}>Chuyển Lead thành Học viên</span>}
         onCancel={() => setConvertLead(null)}
         onOk={() => convertMutation.mutate({ leadId: convertLead!.id, branchId: user?.branch_id ?? '' })}
         confirmLoading={convertMutation.isPending}
         okText="Tạo học viên"
-        styles={{ body: { background: '#161b22' }, content: { background: '#161b22', border: '1px solid #30363d' } }}
+        styles={{ body: { background: 'var(--mgt-bg-container)' }, content: { background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)' } }}
       >
         <div style={{ marginBottom: 16 }}>
-          <Text style={{ color: '#8b949e' }}>Họ tên: </Text>
-          <Text style={{ color: '#f0f6fc', fontWeight: 600 }}>{convertLead?.ho_ten}</Text>
+          <Text style={{ color: 'var(--mgt-text-secondary)' }}>Họ tên: </Text>
+          <Text style={{ color: 'var(--mgt-text-primary)', fontWeight: 600 }}>{convertLead?.ho_ten}</Text>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <Text style={{ color: '#8b949e' }}>SĐT: </Text>
-          <Text style={{ color: '#f0f6fc' }}>{convertLead?.so_dien_thoai}</Text>
+          <Text style={{ color: 'var(--mgt-text-secondary)' }}>SĐT: </Text>
+          <Text style={{ color: 'var(--mgt-text-primary)' }}>{convertLead?.so_dien_thoai}</Text>
         </div>
         <div>
-          <Text style={{ color: '#8b949e', display: 'block', marginBottom: 8 }}>Loại bằng:</Text>
+          <Text style={{ color: 'var(--mgt-text-secondary)', display: 'block', marginBottom: 8 }}>Loại bằng:</Text>
           <Select value={licenseType} onChange={setLicenseType} style={{ width: '100%' }}
             options={['A1','A2','B1','B2','C'].map(v => ({ label: v, value: v }))} />
         </div>

@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Mobile responsive overrides */
+@media (max-width: 768px) {
+  /* Reduce page padding on mobile */
+  .ant-table-wrapper { overflow-x: auto; }
+  .ant-table { min-width: 600px; }
+}

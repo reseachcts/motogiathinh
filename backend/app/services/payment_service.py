@@ -141,7 +141,7 @@ class PaymentService:
                     email=user.email if user else "",
                     total_collected=row.total_collected,
                     payment_count=row.payment_count,
-                    date=on_date,
+                    on_date=on_date,
                 )
             )
         return summaries

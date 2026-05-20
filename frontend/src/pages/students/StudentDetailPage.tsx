@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Button, Descriptions, Spin, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { studentsApi } from '@/api/students'
+import StudentImageSection from './StudentImageSection'
 import dayjs from 'dayjs'
 
 const { Title, Text } = Typography
@@ -26,21 +27,21 @@ const StudentDetailPage: React.FC = () => {
   })
 
   if (isLoading) return <div style={{ padding: 40, textAlign: 'center' }}><Spin size="large" /></div>
-  if (!student) return <div style={{ padding: 40, color: '#8b949e' }}>Không tìm thấy học viên.</div>
+  if (!student) return <div style={{ padding: 40, color: 'var(--mgt-text-secondary)' }}>Không tìm thấy học viên.</div>
 
   return (
-    <div style={{ padding: '24px 32px', fontFamily: "'Barlow', sans-serif" }}>
+    <div style={{ padding: '16px clamp(16px, 3vw, 32px)', fontFamily: "'Barlow', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
 
-      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ marginBottom: 20, background: '#161b22', border: '1px solid #30363d', color: '#f0f6fc' }}>
+      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ marginBottom: 20, background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)' }}>
         Quay lại
       </Button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-        <Title level={3} style={{ margin: 0, color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
+        <Title level={3} style={{ margin: 0, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
           {student.ten_hoc_vien}
         </Title>
-        <Text style={{ color: '#8b949e', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18 }}>
+        <Text style={{ color: 'var(--mgt-text-secondary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18 }}>
           #{student.ma_hoc_vien}
         </Text>
         <Tag color={STATUS_COLOR[student.trang_thai]}>{STATUS_LABEL[student.trang_thai]}</Tag>
@@ -48,11 +49,11 @@ const StudentDetailPage: React.FC = () => {
         {student.is_repeat_student && <Tag color="purple">Tái đăng ký ({student.repeat_count}x)</Tag>}
       </div>
 
-      <div style={{ background: 'linear-gradient(135deg, #0d1117, #161b22)', border: '1px solid #21262d', borderRadius: 16, padding: 24 }}>
+      <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 16, padding: 24 }}>
         <Descriptions
           column={{ xs: 1, sm: 2, md: 3 }}
-          labelStyle={{ color: '#8b949e', fontSize: 13 }}
-          contentStyle={{ color: '#f0f6fc', fontWeight: 500 }}
+          labelStyle={{ color: 'var(--mgt-text-secondary)', fontSize: 13 }}
+          contentStyle={{ color: 'var(--mgt-text-primary)', fontWeight: 500 }}
         >
           <Descriptions.Item label="Ngày sinh">{dayjs(student.ngay_sinh).format('DD/MM/YYYY')}</Descriptions.Item>
           <Descriptions.Item label="Giới tính">
@@ -69,6 +70,13 @@ const StudentDetailPage: React.FC = () => {
           {student.ghi_chu && <Descriptions.Item label="Ghi chú" span={3}>{student.ghi_chu}</Descriptions.Item>}
         </Descriptions>
       </div>
+
+      <StudentImageSection
+        studentId={id!}
+        portraitUrl={student.anh_the_url}
+        cccdFrontUrl={student.cmnd_front_url}
+        cccdBackUrl={student.cmnd_back_url}
+      />
     </div>
   )
 }

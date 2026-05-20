@@ -72,6 +72,9 @@ class StudentOut(UUIDSchema):
     is_repeat_student: bool
     repeat_count: int
     lead_source: LeadSource | None
+    anh_the_url: str | None
+    cmnd_front_url: str | None
+    cmnd_back_url: str | None
     health_cert_expiry: date | None
     qr_code_url: str | None
     zalo_number: str | None

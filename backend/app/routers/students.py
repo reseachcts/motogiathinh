@@ -1,8 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 
+from app.core.ocr import extract_cccd_info
 from app.core.permissions import branch_scope, check_branch_access, require_role
+from app.core.storage import delete_file, upload_file
 from app.dependencies import DB, CurrentUser
 from app.models.enums import LicenseType, RoleName, StudentStatus
 from app.schemas.common import PaginatedResponse
@@ -54,6 +56,21 @@ async def create_student(
     return await StudentService(db, current_user).create(data, effective_branch, force=force)
 
 
+@router.post("/ocr-cccd")
+async def ocr_cccd(file: UploadFile, current_user: CurrentUser):
+    """Upload a CCCD image and extract identity info via OCR."""
+    if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(400, "File must be JPG, PNG, or WebP")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(400, "File too large (max 10MB)")
+    try:
+        result = extract_cccd_info(content)
+    except Exception as e:
+        raise HTTPException(422, f"OCR failed: {e}")
+    return result
+
+
 @router.get("/{student_id}", response_model=StudentOut)
 async def get_student(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
     student = await StudentService(db, current_user).get_by_id(student_id)
@@ -103,3 +120,60 @@ async def get_student_qr(student_id: uuid.UUID, current_user: CurrentUser, db: D
     img.save(buf, format="PNG")
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
+
+
+IMAGE_FIELD_MAP = {
+    "portrait": "anh_the_url",
+    "cccd_front": "cmnd_front_url",
+    "cccd_back": "cmnd_back_url",
+}
+
+
+@router.post("/{student_id}/upload-image")
+async def upload_student_image(
+    student_id: uuid.UUID,
+    image_type: str = Query(..., description="portrait, cccd_front, or cccd_back"),
+    file: UploadFile = ...,
+    current_user: CurrentUser = ...,
+    db: DB = ...,
+):
+    if image_type not in IMAGE_FIELD_MAP:
+        raise HTTPException(400, f"image_type must be one of: {', '.join(IMAGE_FIELD_MAP)}")
+
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+
+    try:
+        url = await upload_file(file, f"students/{student_id}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    # Delete old file if exists
+    old_url = getattr(student, IMAGE_FIELD_MAP[image_type])
+    if old_url:
+        await delete_file(old_url)
+
+    setattr(student, IMAGE_FIELD_MAP[image_type], url)
+    await db.commit()
+    await db.refresh(student)
+    return {"url": url, "image_type": image_type}
+
+
+@router.delete("/{student_id}/image/{image_type}", status_code=204)
+async def delete_student_image(
+    student_id: uuid.UUID,
+    image_type: str,
+    current_user: CurrentUser,
+    db: DB,
+):
+    if image_type not in IMAGE_FIELD_MAP:
+        raise HTTPException(400, f"image_type must be one of: {', '.join(IMAGE_FIELD_MAP)}")
+
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+
+    url = getattr(student, IMAGE_FIELD_MAP[image_type])
+    if url:
+        await delete_file(url)
+        setattr(student, IMAGE_FIELD_MAP[image_type], None)
+        await db.commit()

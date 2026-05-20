@@ -58,7 +58,6 @@ class PaymentTypeEnum(str, enum.Enum):
 class PaymentMethod(str, enum.Enum):
     cash = "cash"
     bank_transfer = "bank_transfer"
-    vnpay = "vnpay"
     momo = "momo"
     zalopay = "zalopay"
 

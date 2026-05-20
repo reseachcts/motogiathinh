@@ -12,6 +12,7 @@ const StudentCreatePage = React.lazy(() => import('@/pages/students/StudentCreat
 const LeadListPage = React.lazy(() => import('@/pages/leads/LeadListPage'))
 const PaymentListPage = React.lazy(() => import('@/pages/payments/PaymentListPage'))
 const ReportsPage = React.lazy(() => import('@/pages/reports/ReportsPage'))
+const AdminUsersPage = React.lazy(() => import('@/pages/admin/AdminUsersPage'))
 
 const ProtectedRoute: React.FC = () => {
   const token = useAuthStore(s => s.accessToken)
@@ -35,14 +36,15 @@ export const router = createBrowserRouter([
           { path: '/payments', element: <React.Suspense fallback={null}><PaymentListPage /></React.Suspense> },
           { path: '/reports', element: <React.Suspense fallback={null}><ReportsPage /></React.Suspense> },
           // Placeholder routes — to be implemented
-          { path: '/classes', element: <div style={{padding:40,color:'#8b949e'}}>Classes — coming soon</div> },
-          { path: '/schedule', element: <div style={{padding:40,color:'#8b949e'}}>Schedule — coming soon</div> },
-          { path: '/exams', element: <div style={{padding:40,color:'#8b949e'}}>Exams — coming soon</div> },
-          { path: '/certificates', element: <div style={{padding:40,color:'#8b949e'}}>Certificates — coming soon</div> },
-          { path: '/instructors', element: <div style={{padding:40,color:'#8b949e'}}>Instructors — coming soon</div> },
-          { path: '/vehicles', element: <div style={{padding:40,color:'#8b949e'}}>Vehicles — coming soon</div> },
-          { path: '/admin/*', element: <div style={{padding:40,color:'#8b949e'}}>Admin — coming soon</div> },
-          { path: '/profile', element: <div style={{padding:40,color:'#8b949e'}}>Profile — coming soon</div> },
+          { path: '/classes', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Classes — coming soon</div> },
+          { path: '/schedule', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Schedule — coming soon</div> },
+          { path: '/exams', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Exams — coming soon</div> },
+          { path: '/certificates', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Certificates — coming soon</div> },
+          { path: '/instructors', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Instructors — coming soon</div> },
+          { path: '/vehicles', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Vehicles — coming soon</div> },
+          { path: '/admin', element: <React.Suspense fallback={null}><AdminUsersPage /></React.Suspense> },
+          { path: '/admin/users', element: <React.Suspense fallback={null}><AdminUsersPage /></React.Suspense> },
+          { path: '/profile', element: <div style={{padding:40,color:'var(--mgt-text-secondary)'}}>Profile — coming soon</div> },
         ],
       },
     ],

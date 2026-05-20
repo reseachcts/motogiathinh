@@ -65,4 +65,4 @@ class StaffCollectionSummary(BaseSchema):
     email: str
     total_collected: Decimal
     payment_count: int
-    date: date | None = None
+    on_date: date | None = None

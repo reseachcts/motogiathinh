@@ -4,7 +4,7 @@ export type LicenseType = 'A1' | 'A2' | 'B1' | 'B2' | 'C' | 'D' | 'E' | 'F'
 export type StudentStatus = 'pending' | 'active' | 'suspended' | 'completed' | 'dropped'
 export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'overdue' | 'waived' | 'refunded'
 export type PaymentType = 'full' | 'installment' | 'waived'
-export type PaymentMethod = 'cash' | 'bank_transfer' | 'vnpay' | 'momo' | 'zalopay'
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'momo' | 'zalopay'
 export type LeadSource = 'facebook' | 'walk_in' | 'referral' | 'zalo' | 'chatbot' | 'other'
 export type LeadStatus = 'new' | 'contacted' | 'enrolled' | 'lost' | 'unclaimed'
 export type ClassStatus = 'upcoming' | 'enrolling' | 'in_progress' | 'completed' | 'cancelled'
@@ -46,6 +46,9 @@ export interface Student {
   is_repeat_student: boolean
   repeat_count: number
   lead_source: LeadSource | null
+  anh_the_url: string | null
+  cmnd_front_url: string | null
+  cmnd_back_url: string | null
   health_cert_expiry: string | null
   qr_code_url: string | null
   zalo_number: string | null

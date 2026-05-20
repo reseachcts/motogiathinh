@@ -23,7 +23,7 @@ const LoginPage: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0d1117',
+      background: 'var(--mgt-bg-base)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -32,11 +32,13 @@ const LoginPage: React.FC = () => {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
 
       <div style={{
-        width: 400,
-        background: 'linear-gradient(135deg, #161b22, #0d1117)',
-        border: '1px solid #30363d',
+        width: '100%',
+        maxWidth: 400,
+        margin: '0 16px',
+        background: 'var(--mgt-gradient-login)',
+        border: '1px solid var(--mgt-border-strong)',
         borderRadius: 20,
-        padding: '48px 40px',
+        padding: '48px 32px',
         boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
       }}>
         {/* Logo */}
@@ -51,12 +53,12 @@ const LoginPage: React.FC = () => {
           </div>
           <div style={{
             fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: 26, fontWeight: 800, color: '#f0f6fc',
+            fontSize: 26, fontWeight: 800, color: 'var(--mgt-text-primary)',
             letterSpacing: '0.05em',
           }}>
             MOTO GIA THỊNH
           </div>
-          <div style={{ color: '#8b949e', fontSize: 13, marginTop: 4 }}>
+          <div style={{ color: 'var(--mgt-text-secondary)', fontSize: 13, marginTop: 4 }}>
             Hệ thống quản lý trường lái xe
           </div>
         </div>
@@ -66,23 +68,23 @@ const LoginPage: React.FC = () => {
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item name="email" rules={[{ required: true, message: 'Nhập email' }]}>
             <Input
-              prefix={<MailOutlined style={{ color: '#8b949e' }} />}
+              prefix={<MailOutlined style={{ color: 'var(--mgt-text-secondary)' }} />}
               placeholder="Email"
               size="large"
               style={{
-                background: '#0d1117', border: '1px solid #30363d',
-                borderRadius: 10, color: '#f0f6fc',
+                background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)',
+                borderRadius: 10, color: 'var(--mgt-text-primary)',
               }}
             />
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, message: 'Nhập mật khẩu' }]}>
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#8b949e' }} />}
+              prefix={<LockOutlined style={{ color: 'var(--mgt-text-secondary)' }} />}
               placeholder="Mật khẩu"
               size="large"
               style={{
-                background: '#0d1117', border: '1px solid #30363d',
-                borderRadius: 10, color: '#f0f6fc',
+                background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)',
+                borderRadius: 10, color: 'var(--mgt-text-primary)',
               }}
             />
           </Form.Item>

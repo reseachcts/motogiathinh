@@ -42,12 +42,6 @@ class Settings(BaseSettings):
     FB_WEBHOOK_VERIFY_TOKEN: str = "motogiathinh_verify"
     FB_PAGE_BRANCH_MAP: str = "{}"
 
-    # VNPay
-    VNPAY_TMN_CODE: str = ""
-    VNPAY_HASH_SECRET: str = ""
-    VNPAY_URL: str = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-    VNPAY_RETURN_URL: str = "http://localhost:3000/payments/vnpay/return"
-
     # Google Vision (optional OCR)
     GOOGLE_VISION_API_KEY: str = ""
 

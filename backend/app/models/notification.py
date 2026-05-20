@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
@@ -41,8 +41,8 @@ class AuditLog(BaseModel):
     action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    old_values: Mapped[dict | None] = mapped_column()
-    new_values: Mapped[dict | None] = mapped_column()
+    old_values: Mapped[dict | None] = mapped_column(JSONB)
+    new_values: Mapped[dict | None] = mapped_column(JSONB)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(Text)
 

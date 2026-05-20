@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
+import StudentDetailDrawer from './StudentDetailDrawer'
 import {
   Button, Input, Select, Space, Table, Tag, Tooltip, Badge,
   Row, Col, Typography,
@@ -33,6 +34,7 @@ const StudentListPage: React.FC = () => {
   const [status, setStatus] = useState<StudentStatus | ''>('')
   const [licenseType, setLicenseType] = useState<LicenseType | ''>('')
   const [isRepeat, setIsRepeat] = useState<boolean | undefined>()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['students', page, search, status, licenseType, isRepeat, branchId],
@@ -65,8 +67,8 @@ const StudentListPage: React.FC = () => {
       key: 'ten_hoc_vien',
       render: (v: string, row: StudentListItem) => (
         <div>
-          <div style={{ color: '#f0f6fc', fontWeight: 600 }}>{v}</div>
-          <div style={{ color: '#8b949e', fontSize: 12 }}>{row.so_dien_thoai}</div>
+          <div style={{ color: 'var(--mgt-text-primary)', fontWeight: 600 }}>{v}</div>
+          <div style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>{row.so_dien_thoai}</div>
         </div>
       ),
     },
@@ -110,27 +112,27 @@ const StudentListPage: React.FC = () => {
       title: 'Ngày đăng ký',
       dataIndex: 'ngay_dang_ky',
       key: 'ngay_dang_ky',
-      render: (v: string) => <Text style={{ color: '#8b949e', fontSize: 13 }}>{dayjs(v).format('DD/MM/YYYY')}</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 13 }}>{dayjs(v).format('DD/MM/YYYY')}</Text>,
       width: 130,
     },
   ]
 
   return (
-    <div style={{ padding: '24px 32px', fontFamily: "'Barlow', sans-serif" }}>
+    <div style={{ padding: '16px clamp(16px, 3vw, 32px)', fontFamily: "'Barlow', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '0.03em' }}>
+          <h2 style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: '0.03em' }}>
             DANH SÁCH HỌC VIÊN
           </h2>
-          <Text style={{ color: '#8b949e', fontSize: 13 }}>
+          <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 13 }}>
             {data?.total ?? 0} học viên • trang {page}/{data?.pages ?? 1}
           </Text>
         </div>
         <Space>
-          <Button icon={<FileExcelOutlined />} style={{ background: '#12261e', borderColor: '#52c41a30', color: '#52c41a' }}>
+          <Button icon={<FileExcelOutlined />} style={{ background: 'var(--mgt-tag-green-bg)', borderColor: 'var(--mgt-tag-green-border)', color: 'var(--mgt-tag-green-text)' }}>
             Xuất Excel
           </Button>
           <Button
@@ -148,11 +150,11 @@ const StudentListPage: React.FC = () => {
       <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={8} lg={6}>
           <Input
-            prefix={<SearchOutlined style={{ color: '#8b949e' }} />}
+            prefix={<SearchOutlined style={{ color: 'var(--mgt-text-secondary)' }} />}
             placeholder="Tìm tên, SĐT, mã HV, CCCD..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
-            style={{ background: '#161b22', border: '1px solid #30363d', color: '#f0f6fc', borderRadius: 8 }}
+            style={{ background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)', borderRadius: 8 }}
             allowClear
           />
         </Col>
@@ -193,14 +195,14 @@ const StudentListPage: React.FC = () => {
           />
         </Col>
         <Col>
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e' }} />
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-secondary)' }} />
         </Col>
       </Row>
 
       {/* Table */}
       <div style={{
-        background: 'linear-gradient(135deg, #0d1117, #161b22)',
-        border: '1px solid #21262d',
+        background: 'var(--mgt-gradient-card)',
+        border: '1px solid var(--mgt-border)',
         borderRadius: 16, overflow: 'hidden',
       }}>
         <Table
@@ -209,19 +211,21 @@ const StudentListPage: React.FC = () => {
           loading={isLoading}
           rowKey="id"
           size="middle"
+          scroll={{ x: 700 }}
           pagination={{
             current: page,
             pageSize: 20,
             total: data?.total ?? 0,
             onChange: setPage,
             showSizeChanger: false,
-            showTotal: (total) => <Text style={{ color: '#8b949e' }}>Tổng {total} học viên</Text>,
+            showTotal: (total) => <Text style={{ color: 'var(--mgt-text-secondary)' }}>Tổng {total} học viên</Text>,
             style: { padding: '12px 16px' },
           }}
-          onRow={row => ({ onClick: () => navigate(`/students/${row.id}`) })}
-          style={{ cursor: 'pointer' }}
+          onRow={row => ({ onClick: () => setSelectedId(row.id), style: { cursor: 'pointer' } })}
         />
       </div>
+
+      <StudentDetailDrawer studentId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   )
 }

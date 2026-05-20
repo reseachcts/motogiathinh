@@ -44,7 +44,7 @@ const PaymentListPage: React.FC = () => {
       title: 'Học viên',
       dataIndex: 'student_id',
       key: 'student_id',
-      render: (v: string) => <Text style={{ color: '#8b949e', fontSize: 12 }}>{v.slice(0, 8)}...</Text>,
+      render: (v: string) => <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>{v.slice(0, 8)}...</Text>,
     },
     {
       title: 'Loại',
@@ -73,11 +73,11 @@ const PaymentListPage: React.FC = () => {
   ]
 
   return (
-    <div style={{ padding: '24px 32px', fontFamily: "'Barlow', sans-serif" }}>
+    <div style={{ padding: '16px clamp(16px, 3vw, 32px)', fontFamily: "'Barlow', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-        <Title level={3} style={{ margin: 0, color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
+        <Title level={3} style={{ margin: 0, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>
           QUẢN LÝ HỌC PHÍ
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setShowForm(true)}
@@ -88,8 +88,8 @@ const PaymentListPage: React.FC = () => {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
-          <div style={{ background: 'linear-gradient(135deg, #0d1117, #161b22)', border: '1px solid #21262d', borderRadius: 16, padding: 24 }}>
-            <div style={{ color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16, letterSpacing: '0.03em' }}>
+          <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 16, padding: 24 }}>
+            <div style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16, letterSpacing: '0.03em' }}>
               CÒN NỢ / QUÁ HẠN
             </div>
             <Table
@@ -98,21 +98,22 @@ const PaymentListPage: React.FC = () => {
               loading={overdueLoading}
               rowKey="id"
               size="small"
+              scroll={{ x: 600 }}
               pagination={{ pageSize: 15 }}
             />
           </div>
         </Col>
 
         <Col xs={24} lg={8}>
-          <div style={{ background: 'linear-gradient(135deg, #0d1117, #161b22)', border: '1px solid #21262d', borderRadius: 16, padding: 24 }}>
-            <div style={{ color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+          <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 16, padding: 24 }}>
+            <div style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
               THU TIỀN HÔM NAY
             </div>
             {staffSummary?.map(s => (
-              <div key={s.user_id} style={{ padding: '10px 0', borderBottom: '1px solid #21262d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={s.user_id} style={{ padding: '10px 0', borderBottom: '1px solid var(--mgt-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <Text style={{ color: '#f0f6fc', fontWeight: 600, display: 'block' }}>{s.full_name ?? s.email}</Text>
-                  <Text style={{ color: '#8b949e', fontSize: 12 }}>{s.payment_count} giao dịch</Text>
+                  <Text style={{ color: 'var(--mgt-text-primary)', fontWeight: 600, display: 'block' }}>{s.full_name ?? s.email}</Text>
+                  <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 12 }}>{s.payment_count} giao dịch</Text>
                 </div>
                 <Text style={{ color: '#52c41a', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>
                   {formatVND(s.total_collected)}
@@ -120,7 +121,7 @@ const PaymentListPage: React.FC = () => {
               </div>
             ))}
             {(!staffSummary || staffSummary.length === 0) && (
-              <Text style={{ color: '#8b949e' }}>Chưa có giao dịch hôm nay</Text>
+              <Text style={{ color: 'var(--mgt-text-secondary)' }}>Chưa có giao dịch hôm nay</Text>
             )}
           </div>
         </Col>
@@ -129,36 +130,36 @@ const PaymentListPage: React.FC = () => {
       {/* Record payment modal */}
       <Modal
         open={showForm}
-        title={<span style={{ color: '#f0f6fc', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>GHI NHẬN THANH TOÁN</span>}
+        title={<span style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 18, fontWeight: 700 }}>GHI NHẬN THANH TOÁN</span>}
         onCancel={() => { setShowForm(false); form.resetFields() }}
         onOk={() => form.submit()}
         confirmLoading={recordMutation.isPending}
         okText="Lưu"
-        styles={{ body: { background: '#161b22' }, content: { background: '#161b22', border: '1px solid #30363d' } }}
+        styles={{ body: { background: 'var(--mgt-bg-container)' }, content: { background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border-strong)' } }}
       >
         <Form form={form} layout="vertical" onFinish={v => recordMutation.mutate(v)} requiredMark={false}>
-          <Form.Item name="payment_plan_id" label={<Text style={{ color: '#8b949e' }}>Mã kế hoạch thanh toán *</Text>} rules={[{ required: true }]}>
-            <Input placeholder="UUID kế hoạch" style={{ background: '#0d1117', border: '1px solid #30363d', color: '#f0f6fc', borderRadius: 8 }} />
+          <Form.Item name="payment_plan_id" label={<Text style={{ color: 'var(--mgt-text-secondary)' }}>Mã kế hoạch thanh toán *</Text>} rules={[{ required: true }]}>
+            <Input placeholder="UUID kế hoạch" style={{ background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)', borderRadius: 8 }} />
           </Form.Item>
-          <Form.Item name="so_tien" label={<Text style={{ color: '#8b949e' }}>Số tiền (đ) *</Text>} rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%', background: '#0d1117', border: '1px solid #30363d', color: '#f0f6fc', borderRadius: 8 }}
+          <Form.Item name="so_tien" label={<Text style={{ color: 'var(--mgt-text-secondary)' }}>Số tiền (đ) *</Text>} rules={[{ required: true }]}>
+            <InputNumber style={{ width: '100%', background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)', borderRadius: 8 }}
               formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
               placeholder="1.500.000" min={1000} />
           </Form.Item>
-          <Form.Item name="phuong_thuc" label={<Text style={{ color: '#8b949e' }}>Phương thức *</Text>} rules={[{ required: true }]}>
+          <Form.Item name="phuong_thuc" label={<Text style={{ color: 'var(--mgt-text-secondary)' }}>Phương thức *</Text>} rules={[{ required: true }]}>
             <Select options={[
               { label: 'Tiền mặt', value: 'cash' }, { label: 'Chuyển khoản', value: 'bank_transfer' },
-              { label: 'VNPay', value: 'vnpay' }, { label: 'MoMo', value: 'momo' }, { label: 'ZaloPay', value: 'zalopay' },
+              { label: 'MoMo', value: 'momo' }, { label: 'ZaloPay', value: 'zalopay' },
             ]} placeholder="Chọn phương thức" />
           </Form.Item>
-          <Form.Item name="loai_thanh_toan" label={<Text style={{ color: '#8b949e' }}>Loại khoản thu</Text>}>
+          <Form.Item name="loai_thanh_toan" label={<Text style={{ color: 'var(--mgt-text-secondary)' }}>Loại khoản thu</Text>}>
             <Select allowClear options={[
               { label: 'Học phí', value: 'tuition' }, { label: 'Phí thi', value: 'exam_fee' },
               { label: 'Phí chứng chỉ', value: 'certificate' }, { label: 'Khác', value: 'other' },
             ]} placeholder="Chọn" />
           </Form.Item>
-          <Form.Item name="ghi_chu" label={<Text style={{ color: '#8b949e' }}>Ghi chú</Text>}>
-            <Input.TextArea rows={2} style={{ background: '#0d1117', border: '1px solid #30363d', color: '#f0f6fc', borderRadius: 8 }} />
+          <Form.Item name="ghi_chu" label={<Text style={{ color: 'var(--mgt-text-secondary)' }}>Ghi chú</Text>}>
+            <Input.TextArea rows={2} style={{ background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)', borderRadius: 8 }} />
           </Form.Item>
         </Form>
       </Modal>

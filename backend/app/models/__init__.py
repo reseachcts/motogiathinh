@@ -8,7 +8,7 @@ from app.models.lead import Lead
 from app.models.notification import AuditLog, Notification, SystemSetting
 from app.models.payment import Payment, PaymentGatewayLog, PaymentPlan
 from app.models.session_model import Attendance, Session, SessionLog
-from app.models.student import DocumentType, Student, StudentDocument, StudentHealthCheck
+from app.models.student import DocumentType, Student, StudentContact, StudentDocument, StudentHealthCheck
 from app.models.user import AuthToken, User
 from app.models.vehicle import Vehicle, VehicleMaintenance
 
@@ -17,6 +17,7 @@ __all__ = [
     "User",
     "AuthToken",
     "Student",
+    "StudentContact",
     "StudentHealthCheck",
     "DocumentType",
     "StudentDocument",
