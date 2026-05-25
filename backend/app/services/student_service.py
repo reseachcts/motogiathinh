@@ -77,6 +77,16 @@ class StudentService:
             created_by=self.current_user.id,
         )
         self.db.add(student)
+        from app.services.audit_service import log_action
+        await log_action(
+            self.db,
+            user_id=self.current_user.id,
+            branch_id=self.current_user.branch_id,
+            user_role=self.current_user.role.value,
+            action="create",
+            resource="student",
+            new_values={"ten_hoc_vien": data.ten_hoc_vien, "so_dien_thoai": data.so_dien_thoai},
+        )
         await self.db.commit()
         await self.db.refresh(student)
         return StudentCreateResponse(student=StudentOut.model_validate(student))
@@ -94,20 +104,51 @@ class StudentService:
 
     async def update(self, student_id: uuid.UUID, data: StudentUpdate) -> StudentOut:
         student = await self.get_by_id(student_id)
-        for field, value in data.model_dump(exclude_none=True).items():
+        changed = data.model_dump(exclude_none=True)
+        old_values = {k: str(getattr(student, k)) for k in changed if hasattr(student, k)}
+        for field, value in changed.items():
             setattr(student, field, value)
+        from app.services.audit_service import log_action
+        await log_action(
+            self.db,
+            user_id=self.current_user.id,
+            branch_id=self.current_user.branch_id,
+            user_role=self.current_user.role.value,
+            action="update",
+            resource="student",
+            resource_id=student_id,
+            old_values=old_values,
+            new_values={k: str(v) for k, v in changed.items()},
+        )
         await self.db.commit()
         await self.db.refresh(student)
         # Invalidate caches
         from app.core.cache import CacheKeys, cache
-        await cache.delete(f"student:{student_id}:schedule", f"student:{student_id}:payments")
+        await cache.delete(
+            CacheKeys.STUDENT_DETAIL.format(id=str(student_id)),
+            f"student:{student_id}:schedule",
+            f"student:{student_id}:payments",
+        )
         return StudentOut.model_validate(student)
 
     async def delete(self, student_id: uuid.UUID) -> None:
         from datetime import datetime, timezone
         student = await self.get_by_id(student_id)
         student.deleted_at = datetime.now(timezone.utc)
+        from app.services.audit_service import log_action
+        await log_action(
+            self.db,
+            user_id=self.current_user.id,
+            branch_id=self.current_user.branch_id,
+            user_role=self.current_user.role.value,
+            action="delete",
+            resource="student",
+            resource_id=student_id,
+            old_values={"ten_hoc_vien": student.ten_hoc_vien},
+        )
         await self.db.commit()
+        from app.core.cache import CacheKeys, cache
+        await cache.delete(CacheKeys.STUDENT_DETAIL.format(id=str(student_id)))
 
     async def list_students(
         self,
@@ -153,6 +194,103 @@ class StudentService:
             page_size=page_size,
             pages=math.ceil(total / page_size),
         )
+
+    async def get_payment_plans(self, student_id: uuid.UUID) -> list:
+        from app.models.payment import PaymentPlan
+        from app.schemas.payment import PaymentPlanOut
+        from app.core.permissions import branch_scope
+
+        query = (
+            select(PaymentPlan)
+            .where(PaymentPlan.student_id == student_id)
+            .where(PaymentPlan.deleted_at.is_(None))
+        )
+        branch_id = branch_scope(self.current_user)
+        if branch_id:
+            query = query.where(PaymentPlan.branch_id == branch_id)
+        query = query.order_by(PaymentPlan.created_at.desc())
+        result = await self.db.execute(query)
+        plans = result.scalars().all()
+        return [PaymentPlanOut.model_validate(p) for p in plans]
+
+    async def get_payments(self, student_id: uuid.UUID) -> list:
+        from app.models.payment import Payment
+        from app.schemas.payment import PaymentOut
+        from app.core.permissions import branch_scope
+
+        query = (
+            select(Payment)
+            .where(Payment.student_id == student_id)
+            .where(Payment.deleted_at.is_(None))
+        )
+        branch_id = branch_scope(self.current_user)
+        if branch_id:
+            query = query.where(Payment.branch_id == branch_id)
+        query = query.order_by(Payment.collected_at.desc())
+        result = await self.db.execute(query)
+        payments = result.scalars().all()
+        return [PaymentOut.model_validate(p) for p in payments]
+
+    async def get_contacts(self, student_id: uuid.UUID) -> list:
+        from app.models.student import StudentContact
+        from app.schemas.student import StudentContactOut
+
+        result = await self.db.execute(
+            select(StudentContact)
+            .where(StudentContact.student_id == student_id)
+            .where(StudentContact.deleted_at.is_(None))
+            .order_by(StudentContact.is_primary.desc())
+        )
+        contacts = result.scalars().all()
+        return [StudentContactOut.model_validate(c) for c in contacts]
+
+    async def get_enrollments(self, student_id: uuid.UUID) -> list:
+        from sqlalchemy.orm import selectinload
+        from app.models.class_model import Class, ClassEnrollment
+        from app.schemas.class_schema import EnrollmentClassInfo, EnrollmentOut
+
+        query = (
+            select(ClassEnrollment)
+            .options(
+                selectinload(ClassEnrollment.class_).selectinload(Class.course_type)
+            )
+            .join(Class, ClassEnrollment.class_id == Class.id)
+            .where(ClassEnrollment.student_id == student_id)
+            .where(ClassEnrollment.deleted_at.is_(None))
+        )
+        from app.core.permissions import branch_scope
+        branch_id = branch_scope(self.current_user)
+        if branch_id:
+            query = query.where(Class.branch_id == branch_id)
+
+        query = query.order_by(ClassEnrollment.enrollment_date.desc())
+        result = await self.db.execute(query)
+        enrollments = result.scalars().all()
+
+        out = []
+        for e in enrollments:
+            cls = e.class_
+            lop_hoc = EnrollmentClassInfo(
+                id=cls.id,
+                ma_lop=cls.ma_lop,
+                ten_lop=cls.ten_lop,
+                ngay_khai_giang=cls.ngay_khai_giang,
+                ngay_ket_thuc=cls.ngay_ket_thuc,
+                trang_thai=cls.trang_thai,
+                course_type=cls.course_type,
+            )
+            out.append(EnrollmentOut(
+                id=e.id,
+                lop_hoc=lop_hoc,
+                enrollment_date=e.enrollment_date,
+                completion_date=e.completion_date,
+                is_active=e.is_active,
+                ly_thuyet_status=e.ly_thuyet_status,
+                thuc_hanh_status=e.thuc_hanh_status,
+                overall_progress=e.overall_progress,
+                ghi_chu=e.ghi_chu,
+            ))
+        return out
 
     async def get_docs_completeness(self, student_id: uuid.UUID) -> bool:
         """Check if student has uploaded all required documents."""

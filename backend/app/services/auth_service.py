@@ -9,10 +9,11 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
 from app.models.user import User
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse
 
 
 class AuthService:
@@ -41,6 +42,17 @@ class AuthService:
 
         # Update last login
         user.last_login_at = datetime.now(timezone.utc)
+
+        from app.services.audit_service import log_action
+        await log_action(
+            self.db,
+            user_id=user.id,
+            branch_id=user.branch_id,
+            user_role=user.role.value,
+            action="login",
+            resource="user",
+            resource_id=user.id,
+        )
         await self.db.commit()
 
         access_token = create_access_token(
@@ -108,3 +120,22 @@ class AuthService:
             ttl=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             value=1,
         )
+
+    async def change_password(self, user: User, data: ChangePasswordRequest) -> None:
+        from fastapi import HTTPException
+
+        if not verify_password(data.current_password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng")
+        user.password_hash = hash_password(data.new_password)
+
+        from app.services.audit_service import log_action
+        await log_action(
+            self.db,
+            user_id=user.id,
+            branch_id=user.branch_id,
+            user_role=user.role.value,
+            action="change_password",
+            resource="user",
+            resource_id=user.id,
+        )
+        await self.db.commit()

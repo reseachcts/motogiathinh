@@ -80,6 +80,18 @@ class StudentOut(UUIDSchema):
     zalo_number: str | None
     ghi_chu: str | None
     ngay_dang_ky: date
+    ho_ten_nguoi_than: str | None = None
+    sdt_nguoi_than: str | None = None
+    quan_he: str | None = None
+
+
+class StudentContactOut(BaseSchema):
+    id: uuid.UUID
+    contact_name: str | None
+    phone: str
+    relation: str | None
+    is_primary: bool
+    note: str | None
 
 
 class StudentListItem(BaseSchema):

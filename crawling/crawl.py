@@ -92,6 +92,7 @@ def main():
         "exams": "exams",
         "promotions": "promotions",
         "tags": "tags",
+        "registers": "registers",
     }
 
     for name, endpoint in paginated.items():
@@ -105,6 +106,7 @@ def main():
     # Non-paginated / single endpoints
     singles = {
         "provinces": "provinces",
+        "payment_methods": "paymentMethods",
     }
 
     for name, endpoint in singles.items():

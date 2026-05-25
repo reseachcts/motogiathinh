@@ -8,7 +8,10 @@ from app.core.storage import delete_file, upload_file
 from app.dependencies import DB, CurrentUser
 from app.models.enums import LicenseType, RoleName, StudentStatus
 from app.schemas.common import PaginatedResponse
+from app.schemas.class_schema import EnrollmentOut
+from app.schemas.payment import PaymentOut, PaymentPlanOut
 from app.schemas.student import (
+    StudentContactOut,
     StudentCreate,
     StudentCreateResponse,
     StudentListItem,
@@ -65,7 +68,7 @@ async def ocr_cccd(file: UploadFile, current_user: CurrentUser):
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "File too large (max 10MB)")
     try:
-        result = extract_cccd_info(content)
+        result = await extract_cccd_info(content)
     except Exception as e:
         raise HTTPException(422, f"OCR failed: {e}")
     return result
@@ -73,9 +76,16 @@ async def ocr_cccd(file: UploadFile, current_user: CurrentUser):
 
 @router.get("/{student_id}", response_model=StudentOut)
 async def get_student(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    from app.core.cache import CacheKeys, cache
+    cache_key = CacheKeys.STUDENT_DETAIL.format(id=str(student_id))
+    cached = await cache.get(cache_key)
+    if cached:
+        return cached
     student = await StudentService(db, current_user).get_by_id(student_id)
     check_branch_access(current_user, student.branch_id)
-    return StudentOut.model_validate(student)
+    out = StudentOut.model_validate(student).model_dump(mode="json")
+    await cache.setex(cache_key, 1800, out)
+    return out
 
 
 @router.patch("/{student_id}", response_model=StudentOut)
@@ -94,10 +104,67 @@ async def delete_student(student_id: uuid.UUID, current_user: CurrentUser, db: D
     await StudentService(db, current_user).delete(student_id)
 
 
+@router.get("/{student_id}/payment-plans", response_model=list[PaymentPlanOut])
+async def get_student_payment_plans(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+    return await StudentService(db, current_user).get_payment_plans(student_id)
+
+
+@router.get("/{student_id}/payments", response_model=list[PaymentOut])
+async def get_student_payments(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+    return await StudentService(db, current_user).get_payments(student_id)
+
+
+@router.get("/{student_id}/contacts", response_model=list[StudentContactOut])
+async def get_student_contacts(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+    return await StudentService(db, current_user).get_contacts(student_id)
+
+
+@router.get("/{student_id}/enrollments", response_model=list[EnrollmentOut])
+async def get_student_enrollments(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    student = await StudentService(db, current_user).get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+    return await StudentService(db, current_user).get_enrollments(student_id)
+
+
 @router.get("/{student_id}/docs-completeness")
 async def check_docs(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
     complete = await StudentService(db, current_user).get_docs_completeness(student_id)
     return {"student_id": student_id, "docs_complete": complete}
+
+
+@router.get("/{student_id}/resume-pdf")
+async def student_resume_pdf(student_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """Generate and stream a student profile PDF."""
+    from fastapi.responses import StreamingResponse
+    from app.services.pdf_service import generate_student_resume
+
+    svc = StudentService(db, current_user)
+    student = await svc.get_by_id(student_id)
+    check_branch_access(current_user, student.branch_id)
+
+    enrollments = await svc.get_enrollments(student_id)
+    plans = await svc.get_payment_plans(student_id)
+    contacts = await svc.get_contacts(student_id)
+
+    student_dict = StudentOut.model_validate(student).model_dump(mode="json")
+    buf = generate_student_resume(
+        student_dict,
+        [e.model_dump(mode="json") for e in enrollments],
+        [p.model_dump(mode="json") for p in plans],
+        [c.model_dump(mode="json") for c in contacts],
+    )
+    code = student_dict.get("ma_hoc_vien", str(student_id)).replace("/", "-")
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="hoso-{code}.pdf"'},
+    )
 
 
 @router.get("/{student_id}/qr")

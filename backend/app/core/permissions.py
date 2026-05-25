@@ -1,8 +1,9 @@
 import uuid
-from functools import wraps
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.session import get_db
 from app.dependencies import get_current_user
 from app.models.enums import RoleName
 from app.models.user import User
@@ -35,6 +36,30 @@ def branch_scope(current_user: User, branch_id: uuid.UUID | None = None) -> uuid
     if current_user.role == RoleName.admin:
         return branch_id
     return current_user.branch_id
+
+
+def require_perm(resource: str, action: str):
+    """
+    Dependency: checks user has permission to perform action on resource.
+    Admins bypass. Staff: no row in user_permissions = allowed; row with flag=False = denied.
+    action: 'create' | 'read' | 'update' | 'delete'
+    """
+    async def dependency(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        if current_user.role == RoleName.admin:
+            return current_user
+        from app.services.permission_service import check_permission
+        allowed = await check_permission(db, current_user.id, resource, action)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Không có quyền {action} trên {resource}",
+            )
+        return current_user
+
+    return dependency
 
 
 def check_branch_access(current_user: User, resource_branch_id: uuid.UUID) -> None:

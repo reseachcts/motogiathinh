@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, auth, leads, payments, reports, students
+from app.routers import admin, auth, classes, instructors, leads, payments, promotions, reports, sessions, students, vehicles
 
 
 @asynccontextmanager
@@ -38,6 +38,11 @@ API_PREFIX = "/api/v1"
 
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(students.router, prefix=API_PREFIX)
+app.include_router(classes.router, prefix=API_PREFIX)
+app.include_router(instructors.router, prefix=API_PREFIX)
+app.include_router(sessions.router, prefix=API_PREFIX)
+app.include_router(vehicles.router, prefix=API_PREFIX)
+app.include_router(promotions.router, prefix=API_PREFIX)
 app.include_router(payments.router, prefix=API_PREFIX)
 app.include_router(leads.router, prefix=API_PREFIX)
 app.include_router(reports.router, prefix=API_PREFIX)

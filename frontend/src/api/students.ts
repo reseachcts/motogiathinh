@@ -43,6 +43,37 @@ export interface StudentCreateData {
   ghi_chu?: string
 }
 
+export interface StudentContactOut {
+  id: string
+  contact_name: string | null
+  phone: string
+  relation: string | null
+  is_primary: boolean
+  note: string | null
+}
+
+export interface EnrollmentClassInfo {
+  id: string
+  ma_lop: string
+  ten_lop: string
+  ngay_khai_giang: string
+  ngay_ket_thuc: string | null
+  trang_thai: string
+  course_type: { ma_khoa_hoc: string; ten_khoa_hoc: string; loai_bang_lai: string } | null
+}
+
+export interface EnrollmentOut {
+  id: string
+  lop_hoc: EnrollmentClassInfo
+  enrollment_date: string
+  completion_date: string | null
+  is_active: boolean
+  ly_thuyet_status: string
+  thuc_hanh_status: string
+  overall_progress: number
+  ghi_chu: string | null
+}
+
 export const studentsApi = {
   list: (filters: StudentFilters = {}) =>
     apiClient.get<PaginatedResponse<StudentListItem>>('/students', { params: filters }),
@@ -76,6 +107,18 @@ export const studentsApi = {
   deleteImage: (studentId: string, imageType: string) =>
     apiClient.delete(`/students/${studentId}/image/${imageType}`),
 
+  getEnrollments: (id: string) =>
+    apiClient.get<EnrollmentOut[]>(`/students/${id}/enrollments`),
+
+  getPaymentPlans: (id: string) =>
+    apiClient.get<import('@/types').PaymentPlan[]>(`/students/${id}/payment-plans`),
+
+  getPayments: (id: string) =>
+    apiClient.get<import('@/types').PaymentOut[]>(`/students/${id}/payments`),
+
+  getContacts: (id: string) =>
+    apiClient.get<StudentContactOut[]>(`/students/${id}/contacts`),
+
   ocrCccd: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -85,4 +128,7 @@ export const studentsApi = {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
   },
+
+  getResumePdf: (id: string) =>
+    apiClient.get(`/students/${id}/resume-pdf`, { responseType: 'blob' }),
 }

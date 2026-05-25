@@ -65,6 +65,8 @@ class Student(BaseModel):
     # QR / contact shortcuts
     qr_code_url: Mapped[str | None] = mapped_column(String(500))
     zalo_number: Mapped[str | None] = mapped_column(String(20))
+    # Transfer flag
+    is_transfer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Notes
     ghi_chu: Mapped[str | None] = mapped_column(Text)
     # Audit

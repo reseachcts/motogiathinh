@@ -30,6 +30,32 @@ export interface UpdateUserData {
   is_active?: boolean
 }
 
+export interface AuditLogItem {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string | null
+  user_email: string | null
+  user_name: string | null
+  user_role: string | null
+  branch_id: string | null
+  action: string
+  resource: string
+  resource_id: string | null
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
+  ip_address: string | null
+}
+
+export interface AuditLogsParams {
+  page?: number
+  page_size?: number
+  resource?: string
+  action?: string
+  from_date?: string
+  to_date?: string
+}
+
 export const adminApi = {
   listUsers: () => apiClient.get<UserItem[]>('/admin/users'),
 
@@ -41,4 +67,10 @@ export const adminApi = {
 
   deactivateUser: (id: string) =>
     apiClient.delete(`/admin/users/${id}`),
+
+  listAuditLogs: (params: AuditLogsParams = {}) =>
+    apiClient.get<{ items: AuditLogItem[]; total: number; page: number; page_size: number; pages: number }>(
+      '/admin/logs',
+      { params }
+    ),
 }

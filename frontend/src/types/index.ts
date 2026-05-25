@@ -35,6 +35,8 @@ export interface Student {
   ngay_sinh: string
   gioi_tinh: 'male' | 'female' | 'other'
   cccd_number: string | null
+  cccd_issued_date: string | null
+  cccd_issued_place: string | null
   so_dien_thoai: string
   dia_chi_email: string | null
   dia_chi: string | null
@@ -56,6 +58,9 @@ export interface Student {
   ngay_dang_ky: string
   created_at: string
   updated_at: string
+  ho_ten_nguoi_than: string | null
+  sdt_nguoi_than: string | null
+  quan_he: string | null
 }
 
 export interface StudentListItem {
@@ -103,6 +108,8 @@ export interface Payment {
   so_bien_lai: string | null
   ghi_chu: string | null
 }
+
+export type PaymentOut = Payment
 
 export interface Lead {
   id: string

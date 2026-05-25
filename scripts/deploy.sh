@@ -6,7 +6,8 @@
 set -euo pipefail
 
 # ── Load .deploy.env ──────────────────────────────────────────────────────────
-_DEPLOY_ENV="$(cd "$(dirname "$0")/.." && pwd)/.deploy.env"
+_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_DEPLOY_ENV="${DEPLOY_ENV_FILE:-${_ROOT}/.deploy.env}"
 _load_var() {
   local var="$1"
   if [[ -z "${!var:-}" ]] && [[ -f "$_DEPLOY_ENV" ]]; then
@@ -21,6 +22,7 @@ _load_var VPS_PASS
 _load_var VPS_PORT
 _load_var REMOTE_DIR
 _load_var VITE_API_BASE_URL
+_load_var LOCAL_ENV_FILE
 
 VPS_USER="${VPS_USER:-root}"
 VPS_PORT="${VPS_PORT:-22}"
@@ -91,10 +93,13 @@ info "Frontend built → frontend/dist/"
 # ── Prepare build dir ─────────────────────────────────────────────────────────
 step "Preparing build artifacts"
 rm -rf "${BUILD_DIR}"
-mkdir -p "${BUILD_DIR}/frontend" "${BUILD_DIR}/backend" "${BUILD_DIR}/nginx"
+mkdir -p "${BUILD_DIR}/frontend" "${BUILD_DIR}/backend" "${BUILD_DIR}/nginx" "${BUILD_DIR}/ocr_service"
 
 # Backend: full source (docker builds it on server)
 cp -r "${LOCAL_ROOT}/backend/." "${BUILD_DIR}/backend/"
+
+# OCR service: full source (docker builds it on server)
+cp -r "${LOCAL_ROOT}/ocr_service/." "${BUILD_DIR}/ocr_service/"
 
 # Frontend: pre-built dist + slim Dockerfile (skips npm install on server)
 cp -r "${LOCAL_ROOT}/frontend/dist"     "${BUILD_DIR}/frontend/dist"
@@ -151,13 +156,15 @@ SCRIPT
 
 # ── Upload .env (only if server doesn't have one yet) ─────────────────────────
 step "Syncing .env"
+# LOCAL_ENV_FILE allows staging to upload .env.staging as .env on the server
+LOCAL_APP_ENV="${LOCAL_ROOT}/${LOCAL_ENV_FILE:-.env}"
 if remote "test -f ${REMOTE_DIR}/.env" 2>/dev/null; then
   info ".env exists on server, keeping existing"
-elif [[ -f "${LOCAL_ROOT}/.env" ]]; then
-  sync_to_server -az "${LOCAL_ROOT}/.env" "${SSH_TARGET}:${REMOTE_DIR}/.env"
-  info "Uploaded local .env to server"
+elif [[ -f "${LOCAL_APP_ENV}" ]]; then
+  sync_to_server -az "${LOCAL_APP_ENV}" "${SSH_TARGET}:${REMOTE_DIR}/.env"
+  info "Uploaded ${LOCAL_APP_ENV} → server .env"
 else
-  die "No .env on server and no local .env found — create .env before deploying"
+  die "No .env on server and no local env file found (${LOCAL_APP_ENV}) — create it before deploying"
 fi
 
 # ── Start containers ──────────────────────────────────────────────────────────
@@ -171,6 +178,8 @@ if [ -f docker-compose.prod.yml ]; then
 else
   \$COMPOSE up -d --build --remove-orphans
 fi
+# Restart nginx so it re-resolves upstream container IPs after recreation
+\$COMPOSE restart nginx
 SCRIPT
 
 # ── DB migrations ─────────────────────────────────────────────────────────────

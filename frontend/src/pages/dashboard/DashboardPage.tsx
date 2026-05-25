@@ -13,6 +13,7 @@ import { leadsApi } from '@/api/leads'
 import { useAuthStore } from '@/store/authStore'
 import { useBranchStore } from '@/store/branchStore'
 import { useThemeColors } from '@/hooks/useThemeColors'
+import { useUiStore } from '@/store/uiStore'
 import { formatVND, MONTHS_VI, STATUS_COLORS, STATUS_LABELS } from './constants'
 import KpiCard from './KpiCard'
 import StaffCollectionSection from './StaffCollectionSection'
@@ -26,6 +27,9 @@ const DashboardPage: React.FC = () => {
   const branchId = useAuthStore(s => s.branchId())
   const { selectedBranchId, setSelectedBranch } = useBranchStore()
   const tc = useThemeColors()
+  const isDark = useUiStore(s => s.themeMode) === 'dark'
+  const axisLine = isDark ? '#484f58' : '#d9d9d9'
+  const gridLine = isDark ? 'rgba(255,255,255,0.09)' : '#f0f0f0'
 
   const effectiveBranch = isAdmin ? (selectedBranchId ?? undefined) : (branchId ?? undefined)
   const currentYear = new Date().getFullYear()
@@ -66,6 +70,9 @@ const DashboardPage: React.FC = () => {
       color: STATUS_COLORS[status] ?? '#8c8c8c',
     }))
 
+  const axisX = { labelFill: tc['--mgt-text-secondary'], labelFontSize: 11, lineStroke: axisLine, tickStroke: axisLine }
+  const axisY = { ...axisX, gridStroke: gridLine, gridLineDash: [4, 4], labelFormatter: (v: number) => `${(v / 1_000_000).toFixed(0)}tr` }
+
   const columnConfig = {
     data: revenueChartData,
     xField: 'month',
@@ -74,19 +81,7 @@ const DashboardPage: React.FC = () => {
     columnStyle: { radius: [4, 4, 0, 0], fill: 'l(90) 0:#4096ff 1:#1677ff' },
     label: false,
     tooltip: { formatter: (d: { 'Doanh thu': number }) => ({ name: 'Doanh thu', value: formatVND(d['Doanh thu']) }) },
-    xAxis: {
-      label: { style: { fill: tc['--mgt-text-secondary'], fontSize: 12, fontFamily: "'Barlow', sans-serif" } },
-      line: { style: { stroke: tc['--mgt-border'] } },
-      tickLine: null,
-    },
-    yAxis: {
-      label: { formatter: (v: string) => `${(+v / 1_000_000).toFixed(0)}tr`, style: { fill: tc['--mgt-text-secondary'], fontSize: 11, fontFamily: "'Barlow', sans-serif" } },
-      grid: { line: { style: { stroke: tc['--mgt-border'], lineDash: [4, 4] } } },
-    },
-    theme: { backgroundColor: 'transparent' },
-    animation: { appear: { animation: 'wave-in', duration: 800 } },
-    interactions: [{ type: 'element-active' }],
-    state: { active: { style: { fill: '#4096ff', opacity: 0.85 } } },
+    axis: { x: axisX, y: axisY },
   }
 
   const pieConfig = {
@@ -103,8 +98,6 @@ const DashboardPage: React.FC = () => {
       content: { style: { color: tc['--mgt-text-primary'], fontSize: 26, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif" }, content: String(Object.values(studentCounts).reduce((a, b) => a + b, 0)) },
     },
     tooltip: { formatter: (d: { type: string; value: number }) => ({ name: d.type, value: `${d.value} HV` }) },
-    theme: { backgroundColor: 'transparent' },
-    animation: { appear: { animation: 'zoom-in', duration: 600 } },
   }
 
   return (

@@ -40,7 +40,7 @@ const ReportsPage: React.FC = () => {
           </Title>
           <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 13 }}>Tổng doanh thu {year}: <strong style={{ color: '#52c41a' }}>{formatVND(totalRevenue)}</strong></Text>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Select
             value={year}
             onChange={setYear}

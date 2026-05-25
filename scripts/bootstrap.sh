@@ -4,7 +4,8 @@
 set -euo pipefail
 
 # ── Load .deploy.env ──────────────────────────────────────────────────────────
-_DEPLOY_ENV="$(cd "$(dirname "$0")/.." && pwd)/.deploy.env"
+_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_DEPLOY_ENV="${DEPLOY_ENV_FILE:-${_ROOT}/.deploy.env}"
 _load_var() {
   local var="$1"
   if [[ -z "${!var:-}" ]] && [[ -f "$_DEPLOY_ENV" ]]; then

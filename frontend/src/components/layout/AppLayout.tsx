@@ -3,10 +3,10 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Badge, Drawer, Layout, Menu, Tooltip, Typography } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import {
-  AuditOutlined, BankOutlined, CalendarOutlined, CarOutlined,
-  CloseOutlined, DashboardOutlined, FileTextOutlined, LeftOutlined,
-  LogoutOutlined, MenuOutlined, MessageOutlined, MoonOutlined,
-  PieChartOutlined, RightOutlined, SettingOutlined, SunOutlined,
+  AuditOutlined, BankOutlined, BarChartOutlined, CalendarOutlined, CarOutlined,
+  CloseOutlined, DashboardOutlined, FileTextOutlined, GiftOutlined, HistoryOutlined,
+  KeyOutlined, LeftOutlined, LogoutOutlined, MenuOutlined, MessageOutlined,
+  MoonOutlined, RightOutlined, SettingOutlined, SunOutlined,
   TeamOutlined, TrophyOutlined, UserOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,28 +16,36 @@ import { leadsApi } from '@/api/leads'
 const { Sider, Content } = Layout
 const { Text } = Typography
 const MOBILE_BP = 768
+const COLLAPSE_BP = 1100
 
-const useIsMobile = () => {
-  const [mobile, setMobile] = useState(window.innerWidth < MOBILE_BP)
+const useScreenSize = () => {
+  const get = () => ({
+    isMobile: window.innerWidth < MOBILE_BP,
+    shouldCollapse: window.innerWidth < COLLAPSE_BP,
+  })
+  const [state, setState] = useState(get)
   useEffect(() => {
-    const handler = () => setMobile(window.innerWidth < MOBILE_BP)
+    const handler = () => setState(get())
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
-  return mobile
+  return state
 }
 
 const AppLayout: React.FC = () => {
   const location = useLocation()
   const { user, isAdmin, logout } = useAuth()
-  const [collapsed, setCollapsed] = useState(false)
+  const { isMobile, shouldCollapse } = useScreenSize()
+  const [collapsed, setCollapsed] = useState(() => window.innerWidth < COLLAPSE_BP)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { themeMode, toggleTheme } = useUiStore()
   const isDark = themeMode === 'dark'
-  const isMobile = useIsMobile()
 
   // Close mobile drawer on route change
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  // Auto-collapse sidebar when viewport narrows (zoom in or small window)
+  useEffect(() => { if (shouldCollapse) setCollapsed(true) }, [shouldCollapse])
 
   const { data: unclaimedData } = useQuery({
     queryKey: ['unclaimed-leads'],
@@ -64,11 +72,13 @@ const AppLayout: React.FC = () => {
         </Link>
       ),
     },
-    { key: '/reports',   icon: <PieChartOutlined />,  label: <Link to="/reports">Báo cáo</Link> },
+    { key: '/analytics', icon: <BarChartOutlined />, label: <Link to="/analytics">Thống kê</Link> },
     ...(isAdmin ? [
-      { key: '/instructors', icon: <UserOutlined />, label: <Link to="/instructors">Giáo viên</Link> },
-      { key: '/vehicles',    icon: <CarOutlined />,  label: <Link to="/vehicles">Phương tiện</Link> },
-      { key: '/admin',       icon: <SettingOutlined />, label: <Link to="/admin">Quản trị</Link> },
+      { key: '/instructors', icon: <UserOutlined />,     label: <Link to="/instructors">Giáo viên</Link> },
+      { key: '/vehicles',    icon: <CarOutlined />,      label: <Link to="/vehicles">Phương tiện</Link> },
+      { key: '/promotions',  icon: <GiftOutlined />,     label: <Link to="/promotions">Khuyến mãi</Link> },
+      { key: '/admin',       icon: <SettingOutlined />,  label: <Link to="/admin">Quản trị</Link> },
+      { key: '/admin/logs',  icon: <HistoryOutlined />,  label: <Link to="/admin/logs">Nhật ký</Link> },
     ] : []),
   ]
 
@@ -99,9 +109,14 @@ const AppLayout: React.FC = () => {
             </Text>
             <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 11 }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
           </div>
-          <Tooltip title="Đăng xuất">
-            <LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer', flexShrink: 0 }} />
-          </Tooltip>
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            <Tooltip title="Đổi mật khẩu">
+              <Link to="/profile"><KeyOutlined style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Link>
+            </Tooltip>
+            <Tooltip title="Đăng xuất">
+              <LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} />
+            </Tooltip>
+          </div>
         </div>
       </div>
     </>
@@ -160,10 +175,10 @@ const AppLayout: React.FC = () => {
 
       {/* Desktop sidebar */}
       {!isMobile && (
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0, overflow: 'visible', zIndex: 100 }}>
           <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} trigger={null} width={220} collapsedWidth={64}
             className="mgt-sidebar"
-            style={{ background: 'var(--mgt-bg-container)', borderRight: '1px solid var(--mgt-border)', position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}>
+            style={{ background: 'var(--mgt-bg-container)', borderRight: '1px solid var(--mgt-border)', height: '100%', overflow: 'hidden' }}>
             <div style={{ padding: collapsed ? '20px 0' : '20px 20px 16px', textAlign: collapsed ? 'center' : 'left', borderBottom: '1px solid var(--mgt-border)' }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #1677ff, #0958d9)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: collapsed ? 0 : 8 }}>
                 <CarOutlined style={{ color: '#fff', fontSize: 18 }} />
@@ -187,21 +202,24 @@ const AppLayout: React.FC = () => {
                       <Text style={{ color: 'var(--mgt-text-primary)', fontSize: 13, fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.full_name ?? user?.email}</Text>
                       <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 11 }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
                     </div>
-                    <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer', flexShrink: 0 }} /></Tooltip>
+                    <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                      <Tooltip title="Đổi mật khẩu"><Link to="/profile"><KeyOutlined style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Link></Tooltip>
+                      <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Tooltip>
+                    </div>
                   </>
                 )}
               </div>
             </div>
           </Sider>
           <div className="mgt-collapse-btn" onClick={() => setCollapsed(!collapsed)}
-            style={{ position: 'fixed', top: 28, left: collapsed ? 52 : 208, zIndex: 100, width: 24, height: 24, borderRadius: '50%', background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--mgt-text-secondary)', fontSize: 11, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'left 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease' }}>
+            style={{ position: 'absolute', top: 28, right: -12, zIndex: 101, width: 24, height: 24, borderRadius: '50%', background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--mgt-text-secondary)', fontSize: 11, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'background 0.2s ease, color 0.2s ease, transform 0.2s ease' }}>
             {collapsed ? <RightOutlined /> : <LeftOutlined />}
           </div>
         </div>
       )}
 
-      <Layout style={{ background: 'var(--mgt-bg-base)' }}>
-        <Content style={{ background: 'var(--mgt-bg-base)' }}>
+      <Layout style={{ background: 'var(--mgt-bg-base)', minWidth: 0, overflow: 'hidden' }}>
+        <Content style={{ background: 'var(--mgt-bg-base)', minWidth: 0 }}>
           <Outlet />
         </Content>
       </Layout>

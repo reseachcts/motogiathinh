@@ -85,9 +85,10 @@ class PaymentService:
         await self.db.commit()
         await self.db.refresh(payment)
 
-        # Invalidate student payment cache
-        from app.core.cache import cache
-        await cache.delete(f"student:{plan.student_id}:payments")
+        # Invalidate caches
+        from app.core.cache import CacheKeys, cache
+        await cache.delete(CacheKeys.STUDENT_PAYMENTS.format(id=str(plan.student_id)))
+        await cache.delete_pattern("report:dashboard:*")
 
         return PaymentOut.model_validate(payment)
 

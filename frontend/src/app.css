@@ -1,8 +1,32 @@
 @import "tailwindcss";
 
-/* Mobile responsive overrides */
+/* Prevent layout from breaking at any zoom level */
+#root,
+.ant-layout {
+  min-width: 0;
+}
+
+/* Content area never overflows the viewport */
+.ant-layout-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Tables always get a horizontal scrollbar rather than breaking layout */
+.ant-table-wrapper {
+  overflow-x: auto !important;
+}
+
+/* Mobile / high-zoom */
 @media (max-width: 768px) {
-  /* Reduce page padding on mobile */
-  .ant-table-wrapper { overflow-x: auto; }
   .ant-table { min-width: 600px; }
+  .ant-card-body { padding: 12px !important; }
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content { padding: 8px !important; }
+}
+
+/* Medium screens and zoomed-in desktop (sidebar auto-collapses here) */
+@media (max-width: 1100px) {
+  /* Tighten page padding so content doesn't feel cramped */
+  .ant-descriptions { font-size: 12px; }
 }

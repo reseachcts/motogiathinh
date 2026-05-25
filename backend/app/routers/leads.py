@@ -62,14 +62,25 @@ async def list_leads(
 
 @router.get("/unclaimed-count")
 async def unclaimed_count(current_user: CurrentUser, db: DB):
+    from app.core.cache import CacheKeys, cache
     effective_branch = branch_scope(current_user)
+    cache_key = CacheKeys.LEADS_UNCLAIMED.format(
+        branch_id=str(effective_branch) if effective_branch else "all"
+    )
+    cached = await cache.get(cache_key)
+    if cached is not None:
+        return cached
     count = await LeadService(db).get_unclaimed_count(effective_branch)
-    return {"count": count}
+    result = {"count": count}
+    await cache.setex(cache_key, 120, result)
+    return result
 
 
 @router.post("/{lead_id}/assign")
 async def assign_lead(lead_id: uuid.UUID, data: LeadAssign, current_user: CurrentUser, db: DB):
+    from app.core.cache import cache
     lead = await LeadService(db).assign_lead(lead_id, data.assigned_to)
+    await cache.delete_pattern("lead:unclaimed:*")
     return LeadOut.model_validate(lead)
 
 

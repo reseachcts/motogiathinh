@@ -79,8 +79,8 @@ class Payment(BaseModel):
     phuong_thuc: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), nullable=False)
     loai_thanh_toan: Mapped[str | None] = mapped_column(String(50))
     # Per-staff tracking
-    collected_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    collected_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -98,7 +98,7 @@ class Payment(BaseModel):
     # Relationships
     student: Mapped["Student"] = relationship("Student", back_populates="payments")
     payment_plan: Mapped["PaymentPlan"] = relationship("PaymentPlan", back_populates="payments")
-    collector: Mapped["User"] = relationship("User", foreign_keys=[collected_by])
+    collector: Mapped["User | None"] = relationship("User", foreign_keys=[collected_by])
     gateway_logs: Mapped[list["PaymentGatewayLog"]] = relationship(
         "PaymentGatewayLog", back_populates="payment"
     )

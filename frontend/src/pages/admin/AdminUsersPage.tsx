@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Col, Form, Input, Modal, Row, Select, Switch, Table, Tag, Typography } from 'antd'
-import { PlusOutlined, UserAddOutlined } from '@ant-design/icons'
+import { Button, Col, Form, Input, Modal, Row, Select, Switch, Table, Tag, Tooltip, Typography } from 'antd'
+import { KeyOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import toast from 'react-hot-toast'
 import { adminApi, UserItem } from '@/api/admin'
+import PermissionDrawer from './PermissionDrawer'
 
 const { Title, Text } = Typography
 
 const AdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [permUser, setPermUser] = useState<UserItem | null>(null)
   const [form] = Form.useForm()
 
   const { data: users, isLoading } = useQuery({
@@ -78,6 +80,19 @@ const AdminUsersPage: React.FC = () => {
       ),
       width: 90,
     },
+    {
+      title: '',
+      width: 48,
+      render: (_: unknown, row: UserItem) =>
+        row.role === 'staff' ? (
+          <Tooltip title="Phân quyền">
+            <KeyOutlined
+              onClick={() => setPermUser(row)}
+              style={{ color: 'var(--mgt-text-secondary)', cursor: 'pointer', fontSize: 15 }}
+            />
+          </Tooltip>
+        ) : null,
+    },
   ]
 
   const inputStyle = { background: 'var(--mgt-bg-base)', border: '1px solid var(--mgt-border-strong)', color: 'var(--mgt-text-primary)', borderRadius: 8 }
@@ -103,6 +118,12 @@ const AdminUsersPage: React.FC = () => {
         <Table dataSource={users ?? []} columns={columns} loading={isLoading} rowKey="id" size="middle" scroll={{ x: 500 }}
           pagination={false} />
       </div>
+
+      <PermissionDrawer
+        open={!!permUser}
+        onClose={() => setPermUser(null)}
+        user={permUser}
+      />
 
       {/* Create modal */}
       <Modal open={showCreate}
