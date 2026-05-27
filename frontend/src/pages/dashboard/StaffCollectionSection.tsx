@@ -1,10 +1,7 @@
 import React from 'react'
-import { Avatar, Space, Spin, Table, Tag, Typography } from 'antd'
-import { CarOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Spin, Table } from 'antd'
 import { formatVND } from './constants'
 import type { StaffCollection } from '@/types'
-
-const { Text } = Typography
 
 interface Props {
   data: StaffCollection[]
@@ -17,15 +14,24 @@ const staffColumns = [
     dataIndex: 'full_name',
     key: 'full_name',
     render: (name: string, row: StaffCollection) => (
-      <Space>
-        <Avatar size={32} style={{ background: '#1677ff', fontSize: 13, fontFamily: "'Barlow', sans-serif" }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Avatar size={32} style={{
+          background: 'linear-gradient(135deg, var(--neon-cyan), var(--neon-violet))',
+          fontWeight: 700, fontSize: 13, flexShrink: 0,
+          color: 'var(--fg-inverse)',
+          fontFamily: 'var(--font-display)',
+        }}>
           {(name || row.email)[0].toUpperCase()}
         </Avatar>
         <div>
-          <div style={{ color: 'var(--mgt-text-primary)', fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{name || '—'}</div>
-          <div style={{ color: 'var(--mgt-text-secondary)', fontSize: 11 }}>{row.email}</div>
+          <div style={{ color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, lineHeight: 1.3, fontFamily: 'var(--font-ui)' }}>
+            {name || '—'}
+          </div>
+          <div style={{ color: 'var(--fg-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+            {row.email}
+          </div>
         </div>
-      </Space>
+      </div>
     ),
   },
   {
@@ -34,12 +40,12 @@ const staffColumns = [
     key: 'payment_count',
     align: 'center' as const,
     render: (v: number) => (
-      <Tag style={{
-        background: 'var(--mgt-tag-blue-bg)', borderColor: 'var(--mgt-tag-blue-border)', color: 'var(--mgt-tag-blue-text)',
-        fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 700,
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+        fontVariantNumeric: 'tabular-nums', color: 'var(--neon-cyan)',
       }}>
         {v}
-      </Tag>
+      </span>
     ),
   },
   {
@@ -48,7 +54,12 @@ const staffColumns = [
     key: 'total_collected',
     align: 'right' as const,
     render: (v: number) => (
-      <span style={{ color: '#52c41a', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>
+      <span style={{
+        color: 'var(--neon-lime)',
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+        fontVariantNumeric: 'tabular-nums',
+        textShadow: '0 0 12px var(--neon-lime-glow)',
+      }}>
         {formatVND(v)}
       </span>
     ),
@@ -56,26 +67,20 @@ const staffColumns = [
 ]
 
 const StaffCollectionSection: React.FC<Props> = ({ data, loading }) => (
-  <div style={{
-    background: 'var(--mgt-gradient-card)',
-    border: '1px solid var(--mgt-border)',
-    borderRadius: 16, padding: '24px', overflow: 'hidden',
-  }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-      <div>
-        <div style={{ color: 'var(--mgt-text-primary)', fontSize: 16, fontWeight: 700, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '0.03em' }}>
-          THU TIỀN THEO NHÂN VIÊN
-        </div>
-        <div style={{ color: 'var(--mgt-text-secondary)', fontSize: 12, marginTop: 2 }}>
-          Hôm nay — {new Date().toLocaleDateString('vi-VN')}
-        </div>
-      </div>
-      <Tag icon={<UserOutlined />} style={{
-        background: 'var(--mgt-tag-green-bg)', borderColor: 'var(--mgt-tag-green-border)', color: 'var(--mgt-tag-green-text)',
-        fontFamily: "'Barlow', sans-serif",
+  <div className="glass-card" style={{ padding: 24, overflow: 'hidden' }}>
+    <div style={{ marginBottom: 20 }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.16em',
+        textTransform: 'uppercase', color: 'var(--fg-3)', display: 'block',
       }}>
-        {data.length} nhân viên
-      </Tag>
+        THU TIỀN HÔM NAY
+      </span>
+      <h3 style={{
+        margin: '4px 0 0', fontFamily: 'var(--font-display)', fontSize: 18,
+        fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.02em',
+      }}>
+        Theo nhân viên · {new Date().toLocaleDateString('vi-VN')}
+      </h3>
     </div>
 
     <Spin spinning={loading}>
@@ -93,23 +98,34 @@ const StaffCollectionSection: React.FC<Props> = ({ data, loading }) => (
             return (
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0}>
-                  <Text style={{ color: 'var(--mgt-text-primary)', fontWeight: 700, fontSize: 13 }}>Tổng cộng</Text>
+                  <span style={{ color: 'var(--fg-1)', fontWeight: 700, fontSize: 13, fontFamily: 'var(--font-ui)' }}>
+                    Tổng cộng
+                  </span>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={1} align="center">
-                  <Text style={{ color: '#4096ff', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700 }}>{txns}</Text>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums', color: 'var(--neon-cyan)',
+                  }}>
+                    {txns}
+                  </span>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={2} align="right">
-                  <Text style={{ color: '#52c41a', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 16, fontWeight: 700 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums', color: 'var(--neon-lime)',
+                    textShadow: '0 0 12px var(--neon-lime-glow)',
+                  }}>
                     {formatVND(total)}
-                  </Text>
+                  </span>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
             )
           }}
         />
       ) : (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--mgt-text-secondary)', fontSize: 14 }}>
-          <CarOutlined style={{ fontSize: 32, display: 'block', marginBottom: 12, opacity: 0.4 }} />
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--fg-3)', fontSize: 14, fontFamily: 'var(--font-ui)' }}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>—</div>
           Chưa có giao dịch hôm nay
         </div>
       )}

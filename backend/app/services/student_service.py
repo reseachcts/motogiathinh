@@ -19,6 +19,28 @@ from app.schemas.common import PaginatedResponse
 from app.utils.id_generator import next_student_id
 
 
+_MISSING_CHECKS = [
+    ('cccd_number', 'Số CCCD'),
+    ('anh_the_url', 'Ảnh thẻ'),
+    ('cmnd_front_url', 'Ảnh CCCD'),
+    ('health_cert_expiry', 'GKSK'),
+    ('ho_ten_nguoi_than', 'Người thân'),
+    ('dia_chi', 'Địa chỉ'),
+]
+
+
+def _missing_fields(student: Student) -> list[str]:
+    result = []
+    today = date.today()
+    for field, label in _MISSING_CHECKS:
+        val = getattr(student, field, None)
+        if not val:
+            result.append(label)
+        elif field == 'health_cert_expiry' and val < today:
+            result.append('GKSK hết hạn')
+    return result
+
+
 class StudentService:
     def __init__(self, db: AsyncSession, current_user: User):
         self.db = db
@@ -187,8 +209,14 @@ class StudentService:
         result = await self.db.execute(query)
         students = result.scalars().all()
 
+        items = []
+        for s in students:
+            item = StudentListItem.model_validate(s)
+            item.missing_fields = _missing_fields(s)
+            items.append(item)
+
         return PaginatedResponse(
-            items=[StudentListItem.model_validate(s) for s in students],
+            items=items,
             total=total,
             page=page,
             page_size=page_size,

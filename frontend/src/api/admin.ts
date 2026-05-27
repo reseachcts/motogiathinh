@@ -57,6 +57,11 @@ export interface AuditLogsParams {
 }
 
 export const adminApi = {
+  listBranches: () =>
+    apiClient.get<Array<{ id: string; ma_chi_nhanh: string; ten_chi_nhanh: string; dia_chi: string | null }>>(
+      '/admin/branches'
+    ),
+
   listUsers: () => apiClient.get<UserItem[]>('/admin/users'),
 
   createUser: (data: CreateUserData) =>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Column, Pie } from '@ant-design/charts'
-import { Button, Col, Row, Select, Spin, Typography } from 'antd'
+import { Area } from '@ant-design/charts'
+import AnalyticsCharts from './AnalyticsCharts'
+import { Button, Col, Row, Select, Spin } from 'antd'
 import {
   DownloadOutlined, FilePdfOutlined, TeamOutlined, UserAddOutlined,
   WarningOutlined, FunnelPlotOutlined, RiseOutlined, FallOutlined,
@@ -12,58 +13,15 @@ import { useBranchStore } from '@/store/branchStore'
 import { useThemeColors } from '@/hooks/useThemeColors'
 import { useUiStore } from '@/store/uiStore'
 
-const { Title } = Typography
-
 const formatVND = (v: number) => new Intl.NumberFormat('vi-VN').format(Math.round(v)) + 'đ'
 const MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
+const CYAN   = { base: '#00E5FF', gradient: 'l(90) 0:#4DEBFF 1:#00E5FF' }
+const VIOLET = { base: '#8B6CFF', gradient: 'l(90) 0:#A896FF 1:#8B6CFF' }
 
-const LICENSE_COLORS: Record<string, string> = { A1: '#1677ff', A2: '#52c41a', B1: '#fa8c16', B2: '#eb2f96', C: '#722ed1', D: '#13c2c2', E: '#f5222d', F: '#faad14' }
-const SOURCE_COLORS: Record<string, string> = { facebook: '#1877f2', walk_in: '#52c41a', referral: '#722ed1', zalo: '#0068ff', chatbot: '#fa8c16', other: '#8c8c8c' }
-const SOURCE_LABELS: Record<string, string> = { facebook: 'Facebook', walk_in: 'Trực tiếp', referral: 'Giới thiệu', zalo: 'Zalo', chatbot: 'Chatbot', other: 'Khác' }
-const METHOD_COLORS: Record<string, string> = { cash: '#52c41a', bank_transfer: '#1677ff', momo: '#d82d8b', zalopay: '#0068ff' }
-const METHOD_LABELS: Record<string, string> = { cash: 'Tiền mặt', bank_transfer: 'Chuyển khoản', momo: 'MoMo', zalopay: 'ZaloPay' }
-const LEAD_STATUS_COLORS: Record<string, string> = { new: '#1677ff', contacted: '#fa8c16', enrolled: '#52c41a', lost: '#f5222d', unclaimed: '#8c8c8c' }
-const LEAD_STATUS_LABELS: Record<string, string> = { new: 'Mới', contacted: 'Đã liên hệ', enrolled: 'Đã đăng ký', lost: 'Mất', unclaimed: 'Chưa nhận' }
 const STATUS_LABELS: Record<string, string> = { active: 'Đang học', completed: 'Hoàn thành', pending: 'Chờ duyệt', suspended: 'Tạm dừng', dropped: 'Nghỉ học' }
-const STATUS_COLORS: Record<string, string> = { active: '#52c41a', completed: '#1677ff', pending: '#fa8c16', suspended: '#faad14', dropped: '#8c8c8c' }
+const STATUS_COLORS: Record<string, string> = { active: '#B6FF3C', completed: '#00E5FF', pending: '#FFB020', suspended: '#FFB020', dropped: '#6b7280' }
 
-const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 16, padding: 20, height: '100%' }}>
-    <div style={{ color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 16, letterSpacing: '0.03em' }}>{title}</div>
-    {children}
-  </div>
-)
-
-const KpiCard = ({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string; sub?: string; color: string }) => (
-  <div style={{ background: 'var(--mgt-gradient-card)', border: '1px solid var(--mgt-border)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-    <div style={{ width: 42, height: 42, borderRadius: 10, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color, flexShrink: 0 }}>{icon}</div>
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 10, color: 'var(--mgt-text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", lineHeight: 1.2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: 'var(--mgt-text-secondary)', marginTop: 1 }}>{sub}</div>}
-    </div>
-  </div>
-)
-
-const GrowthCard = ({ label, value, growth, prevValue, color }: { label: string; value: string; growth: number | null; prevValue: string; color: string }) => {
-  const up = growth !== null && growth >= 0
-  const growthColor = growth === null ? 'var(--mgt-text-secondary)' : growth >= 0 ? '#52c41a' : '#f5222d'
-  return (
-    <div style={{ background: 'var(--mgt-gradient-card)', border: `1px solid var(--mgt-border)`, borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ fontSize: 10, color: 'var(--mgt-text-secondary)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", lineHeight: 1.2 }}>{value}</div>
-      {growth !== null ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 12, color: growthColor, fontWeight: 600 }}>
-          {up ? <RiseOutlined /> : <FallOutlined />}
-          {Math.abs(growth).toFixed(1)}% so với năm trước
-        </div>
-      ) : (
-        <div style={{ fontSize: 11, color: 'var(--mgt-text-secondary)', marginTop: 4 }}>Chưa có dữ liệu năm trước</div>
-      )}
-      <div style={{ fontSize: 10, color: 'var(--mgt-text-secondary)', marginTop: 2 }}>Năm trước: {prevValue}</div>
-    </div>
-  )
-}
+type PeriodType = 'monthly' | 'quarterly' | 'yearly'
 
 function downloadBlob(data: Blob, filename: string) {
   const url = URL.createObjectURL(data)
@@ -72,36 +30,30 @@ function downloadBlob(data: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-type PeriodType = 'monthly' | 'quarterly' | 'yearly'
-
 const AnalyticsPage: React.FC = () => {
   const isAdmin = useAuthStore(s => s.isAdmin())
   const branchId = useAuthStore(s => s.branchId())
   const { selectedBranchId } = useBranchStore()
-  const [year, setYear] = useState(new Date().getFullYear())
+  const tc = useThemeColors()
+  const isDark = useUiStore(s => s.themeMode) === 'dark'
+  const axisLine = isDark ? '#484f58' : '#d9d9d9'
+  const gridLine = isDark ? 'rgba(255,255,255,0.09)' : '#f0f0f0'
+
+  const currentYear = new Date().getFullYear()
+  const [year, setYear] = useState(currentYear)
+  const [compareYear, setCompareYear] = useState<number | null>(currentYear - 1)
   const [periodType, setPeriodType] = useState<PeriodType>('yearly')
   const [selMonth, setSelMonth] = useState(new Date().getMonth() + 1)
   const [selQuarter, setSelQuarter] = useState(Math.ceil((new Date().getMonth() + 1) / 3))
   const [exporting, setExporting] = useState(false)
 
-  const tc = useThemeColors()
-  const isDark = useUiStore(s => s.themeMode) === 'dark'
-  const textSecondary = tc['--mgt-text-secondary']
-  const axisLine = isDark ? '#484f58' : '#d9d9d9'
-  const gridLine = isDark ? 'rgba(255,255,255,0.09)' : '#f0f0f0'
-  const textBody = tc['--mgt-text-body']
-  const textPrimary = tc['--mgt-text-primary']
+  const effectiveBranch = isAdmin ? (selectedBranchId ?? undefined) : (branchId ?? undefined)
 
-  // G2 v5 axis config (xAxis/yAxis are v1-only and ignored in @ant-design/charts v2)
-  const axisX = { labelFill: textSecondary, labelFontSize: 11, lineStroke: axisLine, tickStroke: axisLine }
+  const axisX = { labelFill: tc['--mgt-text-secondary'], labelFontSize: 11, lineStroke: axisLine, tickStroke: axisLine }
   const axisYvnd = { ...axisX, gridStroke: gridLine, gridLineDash: [4, 4], labelFormatter: (v: number) => `${(v / 1_000_000).toFixed(0)}tr` }
   const axisYcnt = { ...axisX, gridStroke: gridLine, gridLineDash: [4, 4] }
-
-  // Pie legend/statistic — still v2-compatible via passthrough
-  const PIE_LEGEND = { position: 'right' as const, itemName: { style: { fill: textBody, fontSize: 11 } } }
-  const PIE_STAT = { title: { style: { color: textSecondary, fontSize: 11 } }, content: { style: { color: textPrimary, fontSize: 20, fontWeight: 700 } } }
-
-  const effectiveBranch = isAdmin ? (selectedBranchId ?? undefined) : (branchId ?? undefined)
+  const PIE_LEGEND = { position: 'right' as const, itemName: { style: { fill: tc['--mgt-text-secondary'], fontSize: 11 } } }
+  const PIE_STAT = { title: { style: { color: tc['--mgt-text-secondary'], fontSize: 11 } }, content: { style: { color: tc['--mgt-text-primary'], fontSize: 20, fontWeight: 700 } } }
 
   const { data: a, isLoading } = useQuery({
     queryKey: ['analytics', year, effectiveBranch],
@@ -111,34 +63,74 @@ const AnalyticsPage: React.FC = () => {
     queryKey: ['revenue', year, effectiveBranch],
     queryFn: () => reportsApi.getRevenue(year, effectiveBranch).then(r => r.data),
   })
+  const { data: compareRevenue } = useQuery({
+    queryKey: ['revenue', compareYear, effectiveBranch],
+    queryFn: () => reportsApi.getRevenue(compareYear!, effectiveBranch).then(r => r.data),
+    enabled: compareYear !== null,
+  })
+  const { data: compareAnalytics } = useQuery({
+    queryKey: ['analytics', compareYear, effectiveBranch],
+    queryFn: () => reportsApi.getAnalytics(compareYear!, effectiveBranch).then(r => r.data),
+    enabled: compareYear !== null,
+  })
 
-  // ── Data prep ─────────────────────────────────────────────────────────────
-  const newThisYear = a?.new_students_by_month.reduce((s, r) => s + r.count, 0) ?? 0
-  const prevYearStudTotal = a?.prev_new_students_by_month.reduce((s, r) => s + r.count, 0) ?? 0
+  // ── KPI sums ──────────────────────────────────────────────────────────────
   const currRevTotal = revenue?.reduce((s, r) => s + r.total, 0) ?? 0
-  const prevRevTotal = a?.prev_year_revenue.reduce((s, r) => s + r.total, 0) ?? 0
-  const revGrowth = prevRevTotal > 0 ? (currRevTotal - prevRevTotal) / prevRevTotal * 100 : null
-  const stuGrowth = prevYearStudTotal > 0 ? (newThisYear - prevYearStudTotal) / prevYearStudTotal * 100 : null
+  const prevRevTotal = compareRevenue?.reduce((s, r) => s + r.total, 0) ?? 0
+  const newThisYear = a?.new_students_by_month.reduce((s, r) => s + r.count, 0) ?? 0
+  const prevYearStudTotal = compareAnalytics?.new_students_by_month.reduce((s, r) => s + r.count, 0) ?? 0
+  const revGrowth = compareYear !== null && prevRevTotal > 0 ? (currRevTotal - prevRevTotal) / prevRevTotal * 100 : null
+  const stuGrowth = compareYear !== null && prevYearStudTotal > 0 ? (newThisYear - prevYearStudTotal) / prevYearStudTotal * 100 : null
 
   const totalLeads = (a?.leads_by_status ?? []).reduce((s, r) => s + r.count, 0)
   const enrolledLeads = a?.leads_by_status.find(r => r.trang_thai === 'enrolled')?.count ?? 0
   const convRate = totalLeads > 0 ? Math.round((enrolledLeads / totalLeads) * 100) : 0
 
-  const revenueCompData = MONTHS.flatMap((m, i) => [
-    { month: m, Năm: String(year), value: revenue?.find(r => r.month === i + 1)?.total ?? 0 },
-    { month: m, Năm: String(year - 1), value: a?.prev_year_revenue.find(r => r.month === i + 1)?.total ?? 0 },
-  ])
-  const studentCompData = MONTHS.flatMap((m, i) => [
-    { month: m, Năm: String(year), value: a?.new_students_by_month.find(r => r.month === i + 1)?.count ?? 0 },
-    { month: m, Năm: String(year - 1), value: a?.prev_new_students_by_month.find(r => r.month === i + 1)?.count ?? 0 },
-  ])
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const revenueCompData = MONTHS.flatMap((m, i) => {
+    const main = { month: m, Năm: String(year), value: revenue?.find(r => r.month === i + 1)?.total ?? 0 }
+    if (compareYear === null) return [main]
+    return [main, { month: m, Năm: String(compareYear), value: compareRevenue?.find(r => r.month === i + 1)?.total ?? 0 }]
+  })
+  const studentCompData = MONTHS.flatMap((m, i) => {
+    const main = { month: m, Năm: String(year), value: a?.new_students_by_month.find(r => r.month === i + 1)?.count ?? 0 }
+    if (compareYear === null) return [main]
+    return [main, { month: m, Năm: String(compareYear), value: compareAnalytics?.new_students_by_month.find(r => r.month === i + 1)?.count ?? 0 }]
+  })
 
-  const licenseData = (a?.students_by_license ?? []).map(r => ({ type: r.license_type, value: r.count }))
-  const statusData = (a?.students_by_status ?? []).map(r => ({ type: STATUS_LABELS[r.status] ?? r.status, value: r.count, _key: r.status }))
-  const revLicData = (a?.revenue_by_license ?? []).sort((a, b) => b.total - a.total).map(r => ({ type: r.license_type, 'Doanh thu': r.total }))
-  const leadSourceData = (a?.leads_by_source ?? []).map(r => ({ type: SOURCE_LABELS[r.lead_source] ?? r.lead_source, value: r.count, _key: r.lead_source }))
-  const leadStatusData = (a?.leads_by_status ?? []).map(r => ({ type: LEAD_STATUS_LABELS[r.trang_thai] ?? r.trang_thai, value: r.count, _key: r.trang_thai }))
-  const paymentMethodData = (a?.payments_by_method ?? []).map(r => ({ method: METHOD_LABELS[r.phuong_thuc] ?? r.phuong_thuc, 'Doanh thu': r.total, _key: r.phuong_thuc }))
+  const yearOptions = Array.from({ length: 5 }, (_, i) => {
+    const y = currentYear - i
+    return { label: String(y), value: y }
+  })
+
+  const compAreaConfig = (data: object[], yField: string, formatter: (d: any) => { name: string; value: string }, axisY: object) => ({
+    data,
+    xField: 'month',
+    yField,
+    shape: 'smooth',
+    ...(compareYear !== null ? {
+      seriesField: 'Năm',
+      color: (datum: { Năm: string }) => datum.Năm === String(year) ? CYAN.base : VIOLET.base,
+      style: (datum: { Năm: string }) => ({
+        fill: datum.Năm === String(year)
+          ? 'l(270) 0:rgba(0,229,255,0.22) 1:rgba(0,229,255,0)'
+          : 'l(270) 0:rgba(139,108,255,0.16) 1:rgba(139,108,255,0)',
+        stroke: datum.Năm === String(year) ? CYAN.base : VIOLET.base,
+        lineWidth: 2.5,
+      }),
+      legend: { position: 'top-right' as const, itemName: { style: { fill: tc['--mgt-text-secondary'], fontSize: 12, fontFamily: '"SF Pro Display", -apple-system, system-ui, sans-serif' } } },
+    } : {
+      style: {
+        fill: 'l(270) 0:rgba(0,229,255,0.22) 1:rgba(0,229,255,0)',
+        stroke: CYAN.base,
+        lineWidth: 2.5,
+      },
+      legend: false,
+    }),
+    label: false,
+    tooltip: { formatter },
+    axis: { x: axisX, y: axisY },
+  })
 
   const handleExportPdf = async () => {
     setExporting(true)
@@ -159,168 +151,148 @@ const AnalyticsPage: React.FC = () => {
     downloadBlob(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `thongke-${year}.xlsx`)
   }
 
-  return (
-    <div style={{ padding: '16px clamp(16px, 3vw, 32px)', fontFamily: "'Barlow', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');`}</style>
+  const growthColor = (g: number | null) => g === null ? 'var(--fg-3)' : g >= 0 ? 'var(--neon-lime)' : 'var(--neon-pink)'
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-        <Title level={3} style={{ margin: 0, color: 'var(--mgt-text-primary)', fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800 }}>THỐNG KÊ & BÁO CÁO</Title>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Select value={periodType} onChange={v => setPeriodType(v as PeriodType)} options={[{label:'Theo tháng',value:'monthly'},{label:'Theo quý',value:'quarterly'},{label:'Cả năm',value:'yearly'}]} style={{ width: 120 }} />
-          {periodType === 'monthly' && <Select value={selMonth} onChange={setSelMonth} options={Array.from({length:12},(_,i)=>({label:`Tháng ${i+1}`,value:i+1}))} style={{ width: 100 }} />}
-          {periodType === 'quarterly' && <Select value={selQuarter} onChange={setSelQuarter} options={[1,2,3,4].map(q=>({label:`Quý ${q}`,value:q}))} style={{ width: 80 }} />}
-          <Select value={year} onChange={setYear} options={[2024,2025,2026].map(y=>({label:`Năm ${y}`,value:y}))} style={{ width: 110 }} />
-          <Button icon={<FilePdfOutlined />} loading={exporting} onClick={handleExportPdf} style={{ background: '#fff2f0', borderColor: '#ffa39e', color: '#cf1322' }}>PDF</Button>
-          <Button icon={<DownloadOutlined />} onClick={handleExportExcel} style={{ background: '#f6ffed', borderColor: '#b7eb8f', color: '#389e0d' }}>Excel</Button>
+  return (
+    <div style={{ padding: '0 0 48px' }}>
+
+      {/* TopBar */}
+      <div style={{ padding: '24px clamp(16px,3vw,32px) 20px' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>THỐNG KÊ</span>
+            <h1 style={{ margin: '4px 0 0', fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 32, letterSpacing: '-0.025em', color: 'var(--fg-1)', lineHeight: 1.1 }}>
+              Phân tích & Báo cáo
+            </h1>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Select value={periodType} onChange={v => setPeriodType(v as PeriodType)} size="small"
+              options={[{label:'Theo tháng',value:'monthly'},{label:'Theo quý',value:'quarterly'},{label:'Cả năm',value:'yearly'}]}
+              style={{ width: 120 }} />
+            {periodType === 'monthly' && <Select value={selMonth} onChange={setSelMonth} size="small"
+              options={Array.from({length:12},(_,i)=>({label:`Tháng ${i+1}`,value:i+1}))} style={{ width: 100 }} />}
+            {periodType === 'quarterly' && <Select value={selQuarter} onChange={setSelQuarter} size="small"
+              options={[1,2,3,4].map(q=>({label:`Quý ${q}`,value:q}))} style={{ width: 80 }} />}
+            <Select value={year} onChange={v => { setYear(v); if (compareYear === v) setCompareYear(null) }}
+              size="small" options={yearOptions} style={{ width: 90 }} />
+            <span style={{ color: 'var(--fg-4)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>vs</span>
+            <Select value={compareYear ?? 'none'}
+              onChange={v => setCompareYear(v === 'none' ? null : v as number)}
+              size="small" style={{ width: 100 }}
+              options={[{ label: '—', value: 'none' }, ...yearOptions.map(o => ({ ...o, disabled: o.value === year }))]} />
+            <Button icon={<FilePdfOutlined />} loading={exporting} onClick={handleExportPdf} size="small">PDF</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportExcel} size="small">Excel</Button>
+          </div>
         </div>
       </div>
 
-      <Spin spinning={isLoading}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 clamp(16px,3vw,32px)' }}>
+        <Spin spinning={isLoading}>
 
-        {/* ── YoY Growth KPIs ─────────────────────────────────────────────── */}
-        <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
-          <Col xs={12} sm={6}>
-            <GrowthCard label={`Doanh thu ${year}`} value={formatVND(currRevTotal)}
-              growth={revGrowth} prevValue={formatVND(prevRevTotal)} color="#1677ff" />
-          </Col>
-          <Col xs={12} sm={6}>
-            <GrowthCard label={`Học viên mới ${year}`} value={String(newThisYear)}
-              growth={stuGrowth} prevValue={`${prevYearStudTotal} HV`} color="#52c41a" />
-          </Col>
-          <Col xs={12} sm={6}><KpiCard icon={<FunnelPlotOutlined />} label="Tỉ lệ chuyển đổi" value={`${convRate}%`} sub={`${enrolledLeads}/${totalLeads} lead`} color="#722ed1" /></Col>
-          <Col xs={12} sm={6}><KpiCard icon={<WarningOutlined />} label={`Quá hạn (${a?.overdue_count ?? 0})`} value={formatVND(a?.overdue_amount ?? 0)} color="#f5222d" /></Col>
-        </Row>
-
-        {/* ── Summary KPIs ─────────────────────────────────────────────────── */}
-        <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}><KpiCard icon={<TeamOutlined />} label="Tổng học viên (tất cả)" value={(a?.total_students ?? 0).toLocaleString()} color="#1677ff" /></Col>
-          {(a?.students_by_status ?? []).map(s => (
-            <Col xs={12} sm={6} key={s.status}>
-              <KpiCard icon={<UserAddOutlined />} label={STATUS_LABELS[s.status] ?? s.status} value={String(s.count)}
-                sub={`${a && a.total_students > 0 ? Math.round(s.count / a.total_students * 100) : 0}%`}
-                color={STATUS_COLORS[s.status] ?? '#8c8c8c'} />
-            </Col>
-          ))}
-        </Row>
-
-        {/* ── Revenue comparison ───────────────────────────────────────────── */}
-        <div style={{ marginBottom: 16 }}>
-          <Card title={`DOANH THU THEO THÁNG — SO SÁNH ${year} vs ${year - 1}`}>
-            <div style={{ height: 260 }}>
-              <Column data={revenueCompData} xField="month" yField="value" seriesField="Năm" group
-                color={['#1677ff', isDark ? '#6ea8fe' : '#adc6ff']}
-                columnStyle={{ radius: [4,4,0,0] }} label={false}
-                tooltip={{ formatter: (d: any) => ({ name: d['Năm'], value: formatVND(d.value) }) }}
-                axis={{ x: axisX, y: axisYvnd }} />
-            </div>
-          </Card>
-        </div>
-
-        {/* ── Student acquisition comparison ───────────────────────────────── */}
-        <div style={{ marginBottom: 16 }}>
-          <Card title={`HỌC VIÊN MỚI THEO THÁNG — SO SÁNH ${year} vs ${year - 1}`}>
-            <div style={{ height: 220 }}>
-              <Column data={studentCompData} xField="month" yField="value" seriesField="Năm" group
-                color={['#52c41a', isDark ? '#95de64' : '#b7eb8f']}
-                columnStyle={{ radius: [4,4,0,0] }} label={false}
-                tooltip={{ formatter: (d: any) => ({ name: d['Năm'], value: `${d.value} HV` }) }}
-                axis={{ x: axisX, y: axisYcnt }} />
-            </div>
-          </Card>
-        </div>
-
-        {/* ── Status breakdown + Revenue by license ───────────────────────── */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={24} lg={10}>
-            <Card title="TRẠNG THÁI HỌC VIÊN (TẤT CẢ THỜI GIAN)">
-              <div style={{ height: 220 }}>
-                <Pie data={statusData.length ? statusData : [{ type: '—', value: 1, _key: '' }]}
-                  angleField="value" colorField="type"
-                  color={statusData.length ? statusData.map(d => STATUS_COLORS[d._key] ?? '#8c8c8c') : ['#e8e8e8']}
-                  radius={0.85} innerRadius={0.62} label={false}
-                  statistic={{ ...PIE_STAT, title: { ...PIE_STAT.title, content: 'Tổng' }, content: { ...PIE_STAT.content, content: String(a?.total_students ?? 0) } }}
-                  legend={PIE_LEGEND} tooltip={{ formatter: (d: any) => ({ name: d.type, value: `${d.value} HV` }) }} />
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} lg={14}>
-            <Card title={`DOANH THU THEO LOẠI BẰNG — ${year}`}>
-              <div style={{ height: 220 }}>
-                {revLicData.length > 0 ? (
-                  <Column data={revLicData} xField="type" yField="Doanh thu"
-                    color={({ type }: any) => LICENSE_COLORS[type] ?? '#1677ff'}
-                    columnStyle={{ radius: [4,4,0,0] }} label={false}
-                    tooltip={{ formatter: (d: any) => ({ name: `Bằng ${d.type}`, value: formatVND(d['Doanh thu']) }) }}
-                    axis={{ x: axisX, y: axisYvnd }} />
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--mgt-text-secondary)', fontSize: 13 }}>
-                    Chưa có dữ liệu thanh toán năm {year}
+          {/* ── YoY Growth KPIs ─────────────────────────────────────────────── */}
+          <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+            <Col xs={12} sm={6}>
+              <div className="glass-card" style={{ padding: '14px 16px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 4 }}>Doanh thu {year}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--neon-cyan)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>{formatVND(currRevTotal)}</div>
+                {compareYear !== null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 12, color: growthColor(revGrowth), fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                    {revGrowth !== null ? (revGrowth >= 0 ? <RiseOutlined /> : <FallOutlined />) : null}
+                    {revGrowth !== null ? `${Math.abs(revGrowth).toFixed(1)}%` : '—'} vs {compareYear}
                   </div>
                 )}
+                {compareYear !== null && <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{compareYear}: {formatVND(prevRevTotal)}</div>}
               </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* ── License type count + Lead source ────────────────────────────── */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={24} lg={10}>
-            <Card title="PHÂN BỔ LOẠI BẰNG (SỐ HỌC VIÊN)">
-              <div style={{ height: 220 }}>
-                <Pie data={licenseData.length ? licenseData : [{ type: '—', value: 1 }]}
-                  angleField="value" colorField="type"
-                  color={licenseData.length ? licenseData.map(d => LICENSE_COLORS[d.type] ?? '#8c8c8c') : ['#e8e8e8']}
-                  radius={0.85} innerRadius={0.62} label={false}
-                  statistic={{ ...PIE_STAT, title: { ...PIE_STAT.title, content: 'Tổng' }, content: { ...PIE_STAT.content, content: String(a?.total_students ?? 0) } }}
-                  legend={PIE_LEGEND} tooltip={{ formatter: (d: any) => ({ name: d.type, value: `${d.value} HV` }) }} />
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} lg={14}>
-            <Card title={`NGUỒN LEAD — ${year}`}>
-              <div style={{ height: 220 }}>
-                <Pie data={leadSourceData.length ? leadSourceData : [{ type: '—', value: 1, _key: '' }]}
-                  angleField="value" colorField="type"
-                  color={leadSourceData.length ? leadSourceData.map(d => SOURCE_COLORS[d._key] ?? '#8c8c8c') : ['#e8e8e8']}
-                  radius={0.85} innerRadius={0.62} label={false}
-                  statistic={{ ...PIE_STAT, title: { ...PIE_STAT.title, content: 'Tổng lead' }, content: { ...PIE_STAT.content, content: String(totalLeads) } }}
-                  legend={PIE_LEGEND} tooltip={{ formatter: (d: any) => ({ name: d.type, value: `${d.value} lead` }) }} />
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* ── Lead status + Payment method ────────────────────────────────── */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={24} lg={12}>
-            <Card title={`TRẠNG THÁI LEAD — ${year}`}>
-              <div style={{ height: 220 }}>
-                <Pie data={leadStatusData.length ? leadStatusData : [{ type: '—', value: 1, _key: '' }]}
-                  angleField="value" colorField="type"
-                  color={leadStatusData.length ? leadStatusData.map(d => LEAD_STATUS_COLORS[d._key] ?? '#8c8c8c') : ['#e8e8e8']}
-                  radius={0.85} innerRadius={0.62} label={false}
-                  statistic={{ ...PIE_STAT, title: { ...PIE_STAT.title, content: 'Tổng' }, content: { ...PIE_STAT.content, content: String(totalLeads) } }}
-                  legend={PIE_LEGEND} tooltip={{ formatter: (d: any) => ({ name: d.type, value: `${d.value} lead` }) }} />
-              </div>
-            </Card>
-          </Col>
-          {paymentMethodData.length > 0 && (
-            <Col xs={24} lg={12}>
-              <Card title={`PHƯƠNG THỨC THANH TOÁN — ${year}`}>
-                <div style={{ height: 220 }}>
-                  <Column data={paymentMethodData} xField="method" yField="Doanh thu"
-                    color={({ method }: any) => { const k = Object.entries(METHOD_LABELS).find(([, v]) => v === method)?.[0]; return k ? (METHOD_COLORS[k] ?? '#1677ff') : '#1677ff' }}
-                    columnStyle={{ radius: [4,4,0,0] }} label={false}
-                    tooltip={{ formatter: (d: any) => ({ name: d.method, value: formatVND(d['Doanh thu']) }) }}
-                    axis={{ x: axisX, y: axisYvnd }} />
-                </div>
-              </Card>
             </Col>
-          )}
-        </Row>
+            <Col xs={12} sm={6}>
+              <div className="glass-card" style={{ padding: '14px 16px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 4 }}>Học viên mới {year}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--neon-lime)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>{newThisYear}</div>
+                {compareYear !== null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: 12, color: growthColor(stuGrowth), fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                    {stuGrowth !== null ? (stuGrowth >= 0 ? <RiseOutlined /> : <FallOutlined />) : null}
+                    {stuGrowth !== null ? `${Math.abs(stuGrowth).toFixed(1)}%` : '—'} vs {compareYear}
+                  </div>
+                )}
+                {compareYear !== null && <div style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{compareYear}: {prevYearStudTotal} HV</div>}
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: 'rgba(139,108,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--neon-violet)', flexShrink: 0 }}><FunnelPlotOutlined /></div>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>Tỉ lệ chuyển đổi</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--fg-1)', fontVariantNumeric: 'tabular-nums' }}>{convRate}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>{enrolledLeads}/{totalLeads} lead</div>
+                </div>
+              </div>
+            </Col>
+            <Col xs={12} sm={6}>
+              <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: 'rgba(255,61,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--neon-pink)', flexShrink: 0 }}><WarningOutlined /></div>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>Quá hạn ({a?.overdue_count ?? 0})</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--neon-pink)', fontVariantNumeric: 'tabular-nums' }}>{formatVND(a?.overdue_amount ?? 0)}</div>
+                </div>
+              </div>
+            </Col>
+          </Row>
 
-      </Spin>
+          {/* ── Summary KPIs ─────────────────────────────────────────────────── */}
+          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={6}>
+              <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: 'rgba(0,229,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--neon-cyan)', flexShrink: 0 }}><TeamOutlined /></div>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>Tổng học viên</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--fg-1)', fontVariantNumeric: 'tabular-nums' }}>{(a?.total_students ?? 0).toLocaleString()}</div>
+                </div>
+              </div>
+            </Col>
+            {(a?.students_by_status ?? []).map(s => (
+              <Col xs={12} sm={6} key={s.status}>
+                <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 10, background: `${STATUS_COLORS[s.status] ?? '#6b7280'}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: STATUS_COLORS[s.status] ?? '#6b7280', flexShrink: 0 }}><UserAddOutlined /></div>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>{STATUS_LABELS[s.status] ?? s.status}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--fg-1)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</div>
+                    <div style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>{a && a.total_students > 0 ? Math.round(s.count / a.total_students * 100) : 0}%</div>
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
+
+          {/* ── Revenue comparison ───────────────────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div className="glass-card" style={{ padding: 24 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>DOANH THU THEO THÁNG</span>
+              <h3 style={{ margin: '4px 0 16px', fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.02em' }}>
+                {compareYear !== null ? `So sánh ${year} vs ${compareYear}` : `Năm ${year}`}
+              </h3>
+              <div style={{ height: 260 }}>
+                <Area {...compAreaConfig(revenueCompData, 'value', (d: any) => ({ name: d.Năm, value: formatVND(d.value) }), axisYvnd) as any} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Student acquisition comparison ───────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div className="glass-card" style={{ padding: 24 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--fg-3)' }}>HỌC VIÊN MỚI THEO THÁNG</span>
+              <h3 style={{ margin: '4px 0 16px', fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--fg-1)', letterSpacing: '-0.02em' }}>
+                {compareYear !== null ? `So sánh ${year} vs ${compareYear}` : `Năm ${year}`}
+              </h3>
+              <div style={{ height: 220 }}>
+                <Area {...compAreaConfig(studentCompData, 'value', (d: any) => ({ name: d.Năm, value: `${d.value} HV` }), axisYcnt) as any} />
+              </div>
+            </div>
+          </div>
+
+          <AnalyticsCharts analyticsData={a} year={year} axisX={axisX} axisYvnd={axisYvnd} PIE_LEGEND={PIE_LEGEND} PIE_STAT={PIE_STAT} />
+
+        </Spin>
+      </div>
     </div>
   )
 }

@@ -13,7 +13,7 @@ _load_var() {
   if [[ -z "${!var:-}" ]] && [[ -f "$_DEPLOY_ENV" ]]; then
     local val
     val=$(grep -E "^${var}=" "$_DEPLOY_ENV" | head -1 | cut -d= -f2- | tr -d "\"'") || val=""
-    [[ -n "$val" ]] && export "$var"="$val"
+    [[ -n "$val" ]] && export "$var"="$val" || true
   fi
 }
 _load_var VPS_HOST

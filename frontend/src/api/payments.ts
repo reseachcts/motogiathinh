@@ -31,4 +31,13 @@ export const paymentsApi = {
     apiClient.post<PaymentPlan>(`/payments/plans/${planId}/waive`, null, {
       params: { reason },
     }),
+
+  listPlansRich: (params: { branch_id?: string; status?: string; page?: number; page_size?: number } = {}) =>
+    apiClient.get<PaymentPlanRich[]>('/payments/plans-list', { params }),
+}
+
+export interface PaymentPlanRich extends PaymentPlan {
+  ten_hoc_vien: string
+  ma_hoc_vien: string
+  last_payment_at: string | null
 }

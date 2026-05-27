@@ -11,6 +11,7 @@ from app.schemas.payment import (
     PaymentOut,
     PaymentPlanCreate,
     PaymentPlanOut,
+    PaymentPlanRich,
     StaffCollectionSummary,
 )
 from app.services.payment_service import PaymentService
@@ -61,6 +62,22 @@ async def overdue_payments(
 ):
     effective_branch = branch_scope(current_user, branch_id)
     return await PaymentService(db, current_user).get_overdue_plans(effective_branch)
+
+
+@router.get("/plans-list", response_model=list[PaymentPlanRich])
+async def plans_list(
+    current_user: CurrentUser,
+    db: DB,
+    branch_id: uuid.UUID | None = Query(None),
+    status: str | None = Query(None, description="partial|pending|overdue — comma-separated"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+):
+    effective_branch = branch_scope(current_user, branch_id)
+    statuses = [s.strip() for s in status.split(",")] if status else None
+    return await PaymentService(db, current_user).list_plans_rich(
+        effective_branch, statuses, page, page_size
+    )
 
 
 @router.post(

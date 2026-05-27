@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query
 from app.core.permissions import branch_scope
 from app.dependencies import DB, CurrentUser
 from app.services.report_service import ReportService
+from app.services.timeseries_service import TimeseriesService
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -40,6 +41,20 @@ async def analytics(
 ):
     effective_branch = branch_scope(current_user, branch_id)
     return await ReportService(db).get_analytics(year, effective_branch)
+
+
+@router.get("/timeseries")
+async def timeseries(
+    current_user: CurrentUser,
+    db: DB,
+    type: str = Query("revenue", pattern="^(revenue|students)$"),
+    grain: str = Query("day", pattern="^(hour|day|month)$"),
+    count: int = Query(30, ge=1, le=120),
+    cumulative: bool = Query(False),
+    branch_id: uuid.UUID | None = Query(None),
+):
+    effective_branch = branch_scope(current_user, branch_id)
+    return await TimeseriesService(db).get_timeseries(type, grain, count, cumulative, effective_branch)
 
 
 @router.get("/export-pdf")

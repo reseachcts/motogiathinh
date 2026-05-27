@@ -33,6 +33,13 @@ class PaymentPlanOut(UUIDSchema):
     ghi_chu: str | None
 
 
+class PaymentPlanRich(PaymentPlanOut):
+    """PaymentPlanOut enriched with student display info."""
+    ten_hoc_vien: str = ""
+    ma_hoc_vien: str = ""
+    last_payment_at: datetime | None = None
+
+
 class PaymentCreate(BaseSchema):
     payment_plan_id: uuid.UUID
     so_tien: Decimal

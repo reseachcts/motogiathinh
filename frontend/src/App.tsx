@@ -25,15 +25,16 @@ export default function App() {
       root.style.setProperty(key, value)
     })
     root.style.setProperty('color-scheme', themeMode)
+    root.setAttribute('data-theme', themeMode)
   }, [themeMode])
 
   const antdTheme = {
     algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: {
-      colorPrimary: '#1677ff',
       ...antdTokens[themeMode],
-      borderRadius: 8,
-      fontFamily: "'Barlow', -apple-system, sans-serif",
+      colorPrimary: isDark ? '#00E5FF' : '#0077AA',
+      borderRadius: 14,
+      fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
     },
   }
 
@@ -45,10 +46,11 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: 'var(--mgt-bg-container)',
-              color: 'var(--mgt-text-primary)',
-              border: '1px solid var(--mgt-border-strong)',
-              fontFamily: "'Barlow', sans-serif",
+              background: 'var(--ink-2)',
+              color: 'var(--fg-1)',
+              border: '1px solid var(--glass-stroke-strong)',
+              backdropFilter: 'blur(24px)',
+              fontFamily: '"SF Pro Display", -apple-system, system-ui, sans-serif',
             },
           }}
         />

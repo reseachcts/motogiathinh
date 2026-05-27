@@ -106,6 +106,8 @@ class StudentListItem(BaseSchema):
     branch_id: uuid.UUID
     # Document completeness (computed)
     docs_complete: bool | None = None
+    # Missing important fields (computed by service)
+    missing_fields: list[str] = []
 
 
 class DuplicateConflict(BaseSchema):

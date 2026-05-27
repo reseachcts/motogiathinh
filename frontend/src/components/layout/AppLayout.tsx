@@ -3,11 +3,11 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { Badge, Drawer, Layout, Menu, Tooltip, Typography } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import {
-  AuditOutlined, BankOutlined, BarChartOutlined, CalendarOutlined, CarOutlined,
-  CloseOutlined, DashboardOutlined, FileTextOutlined, GiftOutlined, HistoryOutlined,
+  BankOutlined, BarChartOutlined, CarOutlined,
+  CloseOutlined, DashboardOutlined, GiftOutlined, HistoryOutlined,
   KeyOutlined, LeftOutlined, LogoutOutlined, MenuOutlined, MessageOutlined,
   MoonOutlined, RightOutlined, SettingOutlined, SunOutlined,
-  TeamOutlined, TrophyOutlined, UserOutlined,
+  TeamOutlined, UserOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '@/hooks/useAuth'
 import { useUiStore } from '@/store/uiStore'
@@ -58,11 +58,7 @@ const AppLayout: React.FC = () => {
   const menuItems = [
     { key: '/',          icon: <DashboardOutlined />, label: <Link to="/">Bảng điều khiển</Link> },
     { key: '/students',  icon: <TeamOutlined />,      label: <Link to="/students">Học viên</Link> },
-    { key: '/classes',   icon: <AuditOutlined />,     label: <Link to="/classes">Lớp học</Link> },
-    { key: '/schedule',  icon: <CalendarOutlined />,  label: <Link to="/schedule">Lịch học</Link> },
     { key: '/payments',  icon: <BankOutlined />,      label: <Link to="/payments">Thu học phí</Link> },
-    { key: '/exams',     icon: <TrophyOutlined />,    label: <Link to="/exams">Thi bằng</Link> },
-    { key: '/certificates', icon: <FileTextOutlined />, label: <Link to="/certificates">Chứng chỉ</Link> },
     {
       key: '/leads', icon: <MessageOutlined />,
       label: (
@@ -84,37 +80,41 @@ const AppLayout: React.FC = () => {
 
   const sidebarContent = (
     <>
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--mgt-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #1677ff, #0958d9)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <CarOutlined style={{ color: '#fff', fontSize: 18 }} />
+      <div style={{ padding: '16px 16px 14px', borderBottom: '1px solid var(--glass-stroke)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-cyan-haze)', border: '1px solid rgba(0,229,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CarOutlined style={{ color: 'var(--neon-cyan)', fontSize: 18 }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', color: 'var(--fg-1)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>MOTO GIA THỊNH</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-3)', marginTop: 2 }}>CRM trung tâm dạy lái</div>
+            </div>
           </div>
-          <div style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--mgt-text-primary)', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em', lineHeight: 1.2 }}>
-            MOTO GIA THỊNH
-          </div>
+          <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}>
+            <div onClick={toggleTheme} style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--glass-2)', border: '1px solid var(--glass-stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--fg-3)', flexShrink: 0 }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-3)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-2)' }}>
+              {isDark ? <SunOutlined style={{ fontSize: 14 }} /> : <MoonOutlined style={{ fontSize: 14 }} />}
+            </div>
+          </Tooltip>
         </div>
       </div>
-      <Menu theme={isDark ? 'dark' : 'light'} mode="inline" selectedKeys={[selectedKey]} items={menuItems} style={{ border: 'none', marginTop: 8 }} />
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid var(--mgt-border)' }}>
-        <div onClick={toggleTheme} style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--mgt-text-secondary)', fontSize: 13 }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--mgt-bg-hover)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-          {isDark ? <SunOutlined /> : <MoonOutlined />}
-          {isDark ? 'Chế độ sáng' : 'Chế độ tối'}
-        </div>
-        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--mgt-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Menu theme={isDark ? 'dark' : 'light'} mode="inline" selectedKeys={[selectedKey]} items={menuItems} style={{ border: 'none', marginTop: 8, background: 'transparent' }} />
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid var(--glass-stroke)' }}>
+        <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-            <Text style={{ color: 'var(--mgt-text-primary)', fontSize: 13, fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <Text style={{ color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {user?.full_name ?? user?.email}
             </Text>
-            <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 11 }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
+            <Text style={{ color: 'var(--fg-3)', fontSize: 11 }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             <Tooltip title="Đổi mật khẩu">
-              <Link to="/profile"><KeyOutlined style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Link>
+              <Link to="/profile"><KeyOutlined style={{ color: 'var(--fg-3)', fontSize: 16, cursor: 'pointer' }} /></Link>
             </Tooltip>
             <Tooltip title="Đăng xuất">
-              <LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} />
+              <LogoutOutlined onClick={logout} style={{ color: 'var(--fg-3)', fontSize: 16, cursor: 'pointer' }} />
             </Tooltip>
           </div>
         </div>
@@ -123,33 +123,23 @@ const AppLayout: React.FC = () => {
   )
 
   return (
-    <Layout style={{ minHeight: '100vh', background: 'var(--mgt-bg-base)' }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap');
-        .mgt-sidebar .ant-menu { background: var(--mgt-bg-container) !important; font-family: 'Barlow', sans-serif !important; }
-        .mgt-sidebar .ant-menu-item { border-radius: 8px !important; margin: 2px 8px !important; width: calc(100% - 16px) !important; }
-        .mgt-sidebar .ant-menu-item-selected { background: var(--mgt-bg-hover) !important; }
-        .mgt-sidebar .ant-menu-item:hover { background: var(--mgt-bg-hover) !important; }
-        .mgt-sidebar .ant-menu-item a { color: var(--mgt-text-body) !important; }
-        .mgt-sidebar .ant-menu-item-selected a { color: var(--mgt-accent-primary) !important; }
-        .mgt-sidebar .ant-layout-sider-trigger { display: none !important; }
-        .mgt-collapse-btn:hover { background: var(--mgt-accent-primary) !important; color: #fff !important; border-color: var(--mgt-accent-primary) !important; transform: scale(1.1); }
-      `}</style>
+    <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
 
       {/* Mobile top bar */}
       {isMobile && (
         <div style={{
           position: 'sticky', top: 0, zIndex: 99, padding: '10px 16px',
-          background: 'var(--mgt-bg-container)', borderBottom: '1px solid var(--mgt-border)',
+          background: 'var(--glass-2)', backdropFilter: 'blur(24px) saturate(140%)',
+          borderBottom: '1px solid var(--glass-stroke)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <MenuOutlined onClick={() => setMobileOpen(true)} style={{ fontSize: 20, color: 'var(--mgt-text-primary)', cursor: 'pointer' }} />
-            <span style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--mgt-text-primary)', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em' }}>
+            <MenuOutlined onClick={() => setMobileOpen(true)} style={{ fontSize: 20, color: 'var(--fg-1)', cursor: 'pointer' }} />
+            <span style={{ fontFamily: '"SF Pro Display", -apple-system, system-ui, sans-serif', color: 'var(--fg-1)', fontSize: 14, fontWeight: 700, letterSpacing: '0.04em' }}>
               MOTO GIA THỊNH
             </span>
           </div>
-          <div onClick={toggleTheme} style={{ cursor: 'pointer', color: 'var(--mgt-text-secondary)', fontSize: 18 }}>
+          <div onClick={toggleTheme} style={{ cursor: 'pointer', color: 'var(--fg-3)', fontSize: 18 }}>
             {isDark ? <SunOutlined /> : <MoonOutlined />}
           </div>
         </div>
@@ -161,7 +151,7 @@ const AppLayout: React.FC = () => {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           placement="left"
-          width={260}
+          width={Math.min(260, Math.round(window.innerWidth * 0.85))}
           closeIcon={<CloseOutlined style={{ color: 'var(--mgt-text-secondary)' }} />}
           className="mgt-sidebar"
           styles={{
@@ -175,51 +165,74 @@ const AppLayout: React.FC = () => {
 
       {/* Desktop sidebar */}
       {!isMobile && (
-        <div style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0, overflow: 'visible', zIndex: 100 }}>
-          <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} trigger={null} width={220} collapsedWidth={64}
+        <div style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0, overflow: 'visible', zIndex: 100, padding: '12px 0 12px 12px' }}>
+          <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} trigger={null} width={240} collapsedWidth={64}
             className="mgt-sidebar"
-            style={{ background: 'var(--mgt-bg-container)', borderRight: '1px solid var(--mgt-border)', height: '100%', overflow: 'hidden' }}>
-            <div style={{ padding: collapsed ? '20px 0' : '20px 20px 16px', textAlign: collapsed ? 'center' : 'left', borderBottom: '1px solid var(--mgt-border)' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #1677ff, #0958d9)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: collapsed ? 0 : 8 }}>
-                <CarOutlined style={{ color: '#fff', fontSize: 18 }} />
-              </div>
-              {!collapsed && <div style={{ fontFamily: "'Barlow Condensed', sans-serif", color: 'var(--mgt-text-primary)', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em', lineHeight: 1.2 }}>MOTO GIA THỊNH</div>}
+            style={{ background: 'var(--sidebar-bg)', backdropFilter: 'blur(24px) saturate(140%)', WebkitBackdropFilter: 'blur(24px) saturate(140%)', border: '1px solid var(--glass-stroke)', borderRadius: 20, boxShadow: 'var(--glass-card-shadow)', height: '100%', overflow: 'hidden' }}>
+            <div style={{ padding: collapsed ? '20px 0' : '16px 16px 14px', borderBottom: '1px solid var(--glass-stroke)' }}>
+              {collapsed ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-cyan-haze)', border: '1px solid rgba(0,229,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CarOutlined style={{ color: 'var(--neon-cyan)', fontSize: 18 }} />
+                  </div>
+                  <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'} placement="right">
+                    <div onClick={toggleTheme} style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--glass-2)', border: '1px solid var(--glass-stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--fg-3)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-3)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-2)' }}>
+                      {isDark ? <SunOutlined style={{ fontSize: 14 }} /> : <MoonOutlined style={{ fontSize: 14 }} />}
+                    </div>
+                  </Tooltip>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-cyan-haze)', border: '1px solid rgba(0,229,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <CarOutlined style={{ color: 'var(--neon-cyan)', fontSize: 18 }} />
+                    </div>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-display)', color: 'var(--fg-1)', fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>MOTO GIA THỊNH</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-3)', marginTop: 2 }}>CRM trung tâm dạy lái</div>
+                    </div>
+                  </div>
+                  <Tooltip title={isDark ? 'Chế độ sáng' : 'Chế độ tối'}>
+                    <div onClick={toggleTheme} style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--glass-2)', border: '1px solid var(--glass-stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--fg-3)', flexShrink: 0 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-3)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-2)' }}>
+                      {isDark ? <SunOutlined style={{ fontSize: 14 }} /> : <MoonOutlined style={{ fontSize: 14 }} />}
+                    </div>
+                  </Tooltip>
+                </div>
+              )}
             </div>
-            <Menu theme={isDark ? 'dark' : 'light'} mode="inline" selectedKeys={[selectedKey]} items={menuItems} style={{ border: 'none', marginTop: 8 }} />
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid var(--mgt-border)' }}>
-              <div onClick={toggleTheme} style={{ padding: collapsed ? '12px 0' : '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 8, color: 'var(--mgt-text-secondary)', fontSize: 13 }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--mgt-bg-hover)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                {isDark ? <SunOutlined /> : <MoonOutlined />}
-                {!collapsed && (isDark ? 'Chế độ sáng' : 'Chế độ tối')}
-              </div>
-              <div style={{ padding: collapsed ? '10px 0' : '10px 16px', borderTop: '1px solid var(--mgt-border)', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
+            <Menu theme={isDark ? 'dark' : 'light'} mode="inline" selectedKeys={[selectedKey]} items={menuItems} style={{ border: 'none', marginTop: 8, background: 'transparent' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderTop: '1px solid var(--glass-stroke)' }}>
+              <div style={{ padding: collapsed ? '10px 0' : '10px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
                 {collapsed ? (
-                  <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Tooltip>
+                  <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--fg-3)', fontSize: 16, cursor: 'pointer' }} /></Tooltip>
                 ) : (
-                  <>
+                  <div style={{ padding: '10px', borderRadius: 14, background: 'var(--ink-2)', border: '1px solid var(--glass-stroke)', display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
                     <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                      <Text style={{ color: 'var(--mgt-text-primary)', fontSize: 13, fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.full_name ?? user?.email}</Text>
-                      <Text style={{ color: 'var(--mgt-text-secondary)', fontSize: 11 }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
+                      <Text style={{ color: 'var(--fg-1)', fontSize: 13, fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'var(--font-ui)' }}>{user?.full_name ?? user?.email}</Text>
+                      <Text style={{ color: 'var(--fg-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }}>{isAdmin ? 'Admin' : 'Nhân viên'}</Text>
                     </div>
                     <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-                      <Tooltip title="Đổi mật khẩu"><Link to="/profile"><KeyOutlined style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Link></Tooltip>
-                      <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--mgt-text-secondary)', fontSize: 16, cursor: 'pointer' }} /></Tooltip>
+                      <Tooltip title="Đổi mật khẩu"><Link to="/profile"><KeyOutlined style={{ color: 'var(--fg-3)', fontSize: 16, cursor: 'pointer' }} /></Link></Tooltip>
+                      <Tooltip title="Đăng xuất"><LogoutOutlined onClick={logout} style={{ color: 'var(--fg-3)', fontSize: 16, cursor: 'pointer' }} /></Tooltip>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
           </Sider>
           <div className="mgt-collapse-btn" onClick={() => setCollapsed(!collapsed)}
-            style={{ position: 'absolute', top: 28, right: -12, zIndex: 101, width: 24, height: 24, borderRadius: '50%', background: 'var(--mgt-bg-container)', border: '1px solid var(--mgt-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--mgt-text-secondary)', fontSize: 11, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'background 0.2s ease, color 0.2s ease, transform 0.2s ease' }}>
+            style={{ position: 'absolute', top: 28, right: -12, zIndex: 101, width: 24, height: 24, borderRadius: '50%', background: 'var(--ink-2)', border: '1px solid var(--glass-stroke)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--fg-3)', fontSize: 11, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'background 0.2s ease, color 0.2s ease, transform 0.2s ease' }}>
             {collapsed ? <RightOutlined /> : <LeftOutlined />}
           </div>
         </div>
       )}
 
-      <Layout style={{ background: 'var(--mgt-bg-base)', minWidth: 0, overflow: 'hidden' }}>
-        <Content style={{ background: 'var(--mgt-bg-base)', minWidth: 0 }}>
+      <Layout style={{ background: 'transparent', minWidth: 0, overflow: 'hidden' }}>
+        <Content style={{ background: 'transparent', minWidth: 0 }}>
           <Outlet />
         </Content>
       </Layout>

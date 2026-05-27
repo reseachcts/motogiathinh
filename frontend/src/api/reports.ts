@@ -1,6 +1,22 @@
 import { apiClient } from './client'
 import type { DashboardStats } from '@/types'
 
+export interface TimeseriesBucket {
+  label: string
+  tong: number
+  da_nhan: number
+  con_no: number
+  a1: number
+}
+
+export interface TimeseriesParams {
+  type: 'revenue' | 'students'
+  grain: 'hour' | 'day' | 'month'
+  count: number
+  cumulative?: boolean
+  branch_id?: string
+}
+
 export interface AnalyticsData {
   total_students: number
   students_by_license: Array<{ license_type: string; count: number }>
@@ -33,4 +49,7 @@ export const reportsApi = {
 
   exportExcel: (year: number, branch_id?: string) =>
     apiClient.get('/reports/export-excel', { params: { year, branch_id }, responseType: 'blob' }),
+
+  getTimeseries: (params: TimeseriesParams) =>
+    apiClient.get<TimeseriesBucket[]>('/reports/timeseries', { params }),
 }

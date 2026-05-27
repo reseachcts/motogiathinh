@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.core.permissions import require_admin
 from app.core.security import hash_password
 from app.dependencies import DB, CurrentUser
+from app.models.branch import Branch
 from app.models.user import User
 from app.schemas.audit import AuditLogOut
 from app.schemas.common import PaginatedResponse
@@ -20,6 +21,22 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(require_admin())],
 )
+
+
+@router.get("/branches")
+async def list_branches(db: DB):
+    result = await db.execute(
+        select(Branch).where(Branch.is_active.is_(True)).order_by(Branch.ma_chi_nhanh)
+    )
+    return [
+        {
+            "id": str(b.id),
+            "ma_chi_nhanh": b.ma_chi_nhanh,
+            "ten_chi_nhanh": b.ten_chi_nhanh,
+            "dia_chi": b.dia_chi,
+        }
+        for b in result.scalars().all()
+    ]
 
 
 @router.get("/users", response_model=list[UserListItem])

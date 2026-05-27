@@ -74,6 +74,7 @@ export interface StudentListItem {
   ngay_dang_ky: string
   branch_id: string
   docs_complete: boolean | null
+  missing_fields: string[]
 }
 
 export interface PaymentPlan {

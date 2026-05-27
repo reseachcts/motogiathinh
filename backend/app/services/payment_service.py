@@ -14,6 +14,7 @@ from app.schemas.payment import (
     PaymentOut,
     PaymentPlanCreate,
     PaymentPlanOut,
+    PaymentPlanRich,
     StaffCollectionSummary,
 )
 from app.utils.id_generator import next_payment_id
@@ -171,3 +172,62 @@ class PaymentService:
             )
             for p in plans
         ]
+
+    async def list_plans_rich(
+        self,
+        branch_id: uuid.UUID | None,
+        statuses: list[str] | None,
+        page: int,
+        page_size: int,
+    ) -> list[PaymentPlanRich]:
+        from app.models.student import Student
+
+        query = (
+            select(PaymentPlan)
+            .where(PaymentPlan.deleted_at.is_(None))
+            .order_by(PaymentPlan.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        if branch_id:
+            query = query.where(PaymentPlan.branch_id == branch_id)
+        if statuses:
+            valid_statuses = [PaymentStatus(s) for s in statuses if s in PaymentStatus.__members__]
+            if valid_statuses:
+                query = query.where(PaymentPlan.payment_status.in_(valid_statuses))
+
+        result = await self.db.execute(query)
+        plans = result.scalars().all()
+
+        # Batch load student info
+        student_ids = list({p.student_id for p in plans})
+        students: dict[uuid.UUID, Student] = {}
+        if student_ids:
+            s_res = await self.db.execute(
+                select(Student).where(Student.id.in_(student_ids))
+            )
+            students = {s.id: s for s in s_res.scalars().all()}
+
+        # Batch load last payment date per plan
+        plan_ids = [p.id for p in plans]
+        last_pmt: dict[uuid.UUID, datetime | None] = {}
+        if plan_ids:
+            lp_res = await self.db.execute(
+                select(Payment.payment_plan_id, func.max(Payment.collected_at).label("last_at"))
+                .where(Payment.payment_plan_id.in_(plan_ids), Payment.deleted_at.is_(None))
+                .group_by(Payment.payment_plan_id)
+            )
+            last_pmt = {row[0]: row[1] for row in lp_res.all()}
+
+        out = []
+        for p in plans:
+            s = students.get(p.student_id)
+            out.append(PaymentPlanRich(
+                **p.__dict__,
+                net_amount=p.net_amount,
+                remaining_amount=p.remaining_amount,
+                ten_hoc_vien=s.ten_hoc_vien if s else "",
+                ma_hoc_vien=s.ma_hoc_vien if s else "",
+                last_payment_at=last_pmt.get(p.id),
+            ))
+        return out
