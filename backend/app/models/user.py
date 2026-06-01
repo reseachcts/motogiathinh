@@ -27,6 +27,9 @@ class User(BaseModel):
     # Relationships
     branch: Mapped["Branch | None"] = relationship("Branch", back_populates="users")
     auth_tokens: Mapped[list["AuthToken"]] = relationship("AuthToken", back_populates="user")
+    permissions: Mapped[list["UserPermission"]] = relationship(
+        "UserPermission", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class AuthToken(BaseModel):

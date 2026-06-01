@@ -53,6 +53,8 @@ class Vehicle(BaseModel):
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     ghi_chu: Mapped[str | None] = mapped_column(Text)
     anh_xe_url: Mapped[str | None] = mapped_column(String(500))
+    # Sibling-contract field (added by alembic b1c2d3e4f5a6)
+    rental_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
 
     # Relationships
     maintenance_records: Mapped[list["VehicleMaintenance"]] = relationship(

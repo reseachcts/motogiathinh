@@ -25,3 +25,5 @@ class Promotion(BaseModel):
     end_date: Mapped[date | None] = mapped_column(Date)
     is_partner: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     old_system_id: Mapped[int | None] = mapped_column(Integer)
+    # Sibling-contract field (added by alembic b1c2d3e4f5a6)
+    applies_to_csv: Mapped[str] = mapped_column(String(50), nullable=False, default="A|A1")

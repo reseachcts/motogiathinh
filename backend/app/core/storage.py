@@ -63,6 +63,31 @@ async def upload_file(file: UploadFile, folder: str) -> str:
     return f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{key}"
 
 
+def upload_bytes(key: str, content: bytes, content_type: str = "application/octet-stream") -> str:
+    """Sync upload of raw bytes to MinIO; returns the public URL.
+
+    Used by /api/students/{id}/docs/{key} and /api/payments/{id}/bien-lai
+    where the caller has already read the request body (and validated
+    size/type via magic-bytes elsewhere).
+    """
+    client = _get_client()
+    _ensure_bucket(client)
+    client.put_object(
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=key,
+        Body=content,
+        ContentType=content_type,
+    )
+    return f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/{key}"
+
+
+def get_object_bytes(key: str) -> tuple[bytes, str]:
+    """Fetch raw bytes + content_type for /api/files/<kind>/<recId>/<filename>."""
+    client = _get_client()
+    obj = client.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
+    return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
+
+
 async def delete_file(url: str) -> None:
     """Delete file from MinIO by its URL."""
     prefix = f"{settings.S3_ENDPOINT}/{settings.S3_BUCKET_NAME}/"

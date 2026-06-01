@@ -1,49 +1,99 @@
+"""Promotions CRUD."""
+
 import uuid
+from decimal import Decimal
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
 
-from app.core.permissions import require_admin, require_perm
-from app.dependencies import DB, CurrentUser
-from app.schemas.common import PaginatedResponse
-from app.schemas.promotion_schema import PromotionCreate, PromotionListItem, PromotionOut, PromotionUpdate
-from app.services.promotion_service import PromotionService
+from app.dependencies import DB, CurrentUser, require_permission
+from app.models.promotion import Promotion
 
 router = APIRouter(prefix="/promotions", tags=["promotions"])
 
 
-@router.get("", response_model=PaginatedResponse[PromotionListItem], dependencies=[Depends(require_perm("promotion", "read"))])
-async def list_promotions(
+def _to_wire(p: Promotion) -> dict:
+    applies = ["A", "A1"]
+    raw_csv: Optional[str] = getattr(p, "applies_to_csv", None)
+    if raw_csv:
+        applies = [x for x in raw_csv.split("|") if x in ("A", "A1")] or ["A", "A1"]
+    discount = 0
+    try:
+        if getattr(p, "loai_khuyen_mai", None) == "fixed":
+            discount = int(float(p.gia_tri or 0))
+    except (ValueError, TypeError):
+        discount = 0
+    return {
+        "id": str(p.id),
+        "name": p.ten_khuyen_mai or "",
+        "appliesTo": applies,
+        "discount": discount,
+    }
+
+
+@router.get("")
+async def list_promotions(current_user: CurrentUser, db: DB):
+    res = await db.execute(select(Promotion).where(Promotion.deleted_at.is_(None), Promotion.is_active == True))
+    return [_to_wire(p) for p in res.scalars().all()]
+
+
+class PromotionCreate(BaseModel):
+    name: str
+    appliesTo: list[str] = ["A", "A1"]
+    discount: int = 0
+
+
+class PromotionUpdate(BaseModel):
+    name: Optional[str] = None
+    appliesTo: Optional[list[str]] = None
+    discount: Optional[int] = None
+
+
+def _normalize_applies(arr: list[str]) -> str:
+    out = [x for x in arr if x in ("A", "A1")]
+    return "|".join(out) if out else "A|A1"
+
+
+@router.post("", status_code=201)
+async def create_promotion(
+    data: PromotionCreate,
     current_user: CurrentUser,
     db: DB,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    search: str | None = None,
-    is_active: bool | None = None,
+    _perm: Annotated[None, Depends(require_permission("promotions", "create"))] = None,
 ):
-    return await PromotionService(db, current_user).list_promotions(
-        page=page,
-        page_size=page_size,
-        search=search,
-        is_active=is_active,
+    ma = f"KM-{int(Decimal(uuid.uuid4().int).remainder(10**8)):08d}"
+    p = Promotion(
+        ma_khuyen_mai=ma,
+        ten_khuyen_mai=data.name,
+        loai_khuyen_mai="fixed",
+        gia_tri=Decimal(data.discount),
+        is_active=True,
+        applies_to_csv=_normalize_applies(data.appliesTo),
     )
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return _to_wire(p)
 
 
-@router.post("", response_model=PromotionOut, status_code=201, dependencies=[Depends(require_admin())])
-async def create_promotion(data: PromotionCreate, current_user: CurrentUser, db: DB):
-    return await PromotionService(db, current_user).create(data)
-
-
-@router.get("/{promotion_id}", response_model=PromotionOut)
-async def get_promotion(promotion_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    obj = await PromotionService(db, current_user).get_by_id(promotion_id)
-    return PromotionOut.model_validate(obj)
-
-
-@router.patch("/{promotion_id}", response_model=PromotionOut, dependencies=[Depends(require_admin())])
-async def update_promotion(promotion_id: uuid.UUID, data: PromotionUpdate, current_user: CurrentUser, db: DB):
-    return await PromotionService(db, current_user).update(promotion_id, data)
-
-
-@router.delete("/{promotion_id}", status_code=204, dependencies=[Depends(require_admin())])
-async def delete_promotion(promotion_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    await PromotionService(db, current_user).delete(promotion_id)
+@router.patch("/{promotion_id}")
+async def update_promotion(
+    promotion_id: str,
+    data: PromotionUpdate,
+    current_user: CurrentUser,
+    db: DB,
+    _perm: Annotated[None, Depends(require_permission("promotions", "update"))] = None,
+):
+    try: u = uuid.UUID(promotion_id)
+    except ValueError: raise HTTPException(400, "invalid_id")
+    p = await db.get(Promotion, u)
+    if not p: raise HTTPException(404, "promotion_not_found")
+    fields = data.model_dump(exclude_unset=True)
+    if "name" in fields:       p.ten_khuyen_mai = fields["name"]
+    if "discount" in fields:   p.gia_tri = Decimal(fields["discount"]); p.loai_khuyen_mai = "fixed"
+    if "appliesTo" in fields:  p.applies_to_csv = _normalize_applies(fields["appliesTo"])
+    await db.commit()
+    await db.refresh(p)
+    return _to_wire(p)

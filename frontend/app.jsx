@@ -1,0 +1,332 @@
+// ====================================================================
+// App — routing between screens + modals + detail views
+// ====================================================================
+
+// ScreenErrorBoundary — isolates a single screen's render failure so a
+// crash in one tab doesn't take down the whole shell (sidebar, topbar,
+// other screens). Renders a minimal Vietnamese error card with a
+// "thử lại" button that re-mounts the child tree.
+class ScreenErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, attempt: 0, key: props.resetKey }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  static getDerivedStateFromProps(props, state) {
+    // When the parent's resetKey changes (tab/detail change), clear any
+    // previous error BEFORE the next render — so the new screen gets a
+    // fresh shot. If it crashes too, getDerivedStateFromError catches it.
+    if (props.resetKey !== state.key) {
+      return { error: null, key: props.resetKey };
+    }
+    return null;
+  }
+  componentDidCatch(error, info) { try { console.error("[ScreenErrorBoundary]", error, info); } catch {} }
+  retry = () => this.setState(s => ({ error: null, attempt: s.attempt + 1 }));
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          padding: 40, display: "flex", flexDirection: "column", gap: 12,
+          alignItems: "flex-start",
+        }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--neon-pink)" }}>Lỗi hiển thị màn hình</span>
+          <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)", maxWidth: 640 }}>
+            {String(this.state.error?.message || this.state.error)}
+          </span>
+          <button onClick={this.retry} style={{
+            marginTop: 4, padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+            background: "var(--ink-2)", border: "1px solid var(--glass-stroke)",
+            color: "var(--fg-1)", fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 600,
+          }}>Thử lại</button>
+        </div>
+      );
+    }
+    return <React.Fragment key={this.state.attempt}>{this.props.children}</React.Fragment>;
+  }
+}
+
+function App() {
+  // ThemeProvider wraps the whole app so theme toggles instantly
+  // propagate to any component reading `useTheme()` / `useBranchTones()`.
+  return (
+    <ThemeProvider>
+      <AppRoot/>
+    </ThemeProvider>
+  );
+}
+
+function AppRoot() {
+  const D = window.MGT_DATA;
+  const isAdmin = D.can("dashboard", "r");  // admin-only pseudo-resource
+
+  // Re-render whenever data-loader fires 'mgt:datachanged' (after any
+  // successful create/update/delete). The frozen screens read D.<arrays>
+  // directly with no React state binding, so without this they'd only
+  // refresh on tab-bounce.
+  const [, _bump] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => {
+    const fn = () => _bump();
+    window.addEventListener("mgt:datachanged", fn);
+    return () => window.removeEventListener("mgt:datachanged", fn);
+  }, []);
+
+  // Print mode (?print=dashboard) — sidebar hidden, all sections rendered
+  // expanded, used by the headless-chromium PDF route. Detected once at
+  // mount from window.location.search.
+  const printMode = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("print") === "dashboard";
+
+  // route: { tab: "students"|"payments"|..., detail: null | { type, id } }
+  // Staff don't have the dashboard tab (admin-only); they land on Học viên.
+  const [tab, setTab]       = React.useState(isAdmin ? "dashboard" : "students");
+  const [detail, setDetail] = React.useState(null);
+  const [navCollapsed, setNavCollapsed] = React.useState(!!printMode);
+
+  // modals
+  const [addStudent, setAddStudent] = React.useState(false);
+  const [addPayment, setAddPayment] = React.useState({ open: false, studentId: null, amount: null });
+  const [addClass, setAddClass]     = React.useState(false);
+  const [reportPick, setReportPick] = React.useState(false);
+
+  const unread = D.notifications.filter(n => !n.read).length;
+
+  // Navigation helpers
+  const goTab = (id) => { setTab(id); setDetail(null); };
+  const openStudent = (id, opts) => setDetail({ type: "student", id, ...(opts || {}) });
+  const openPayment = (id) => setDetail({ type: "payment", id });
+  const openClass   = (id) => { setTab("classes"); setDetail({ type: "class", id }); };
+  const openPermissions = (id) => setDetail({ type: "permissions", id });
+
+  const TITLES = {
+    dashboard:    { title: "Tổng quan"            },
+    students:     { title: "Danh sách học viên"   },
+    payments:     { title: "Thanh toán"           },
+    classes:      { title: "Lớp học"               },
+    notifications:{ title: "Thông báo"             },
+    organization: { title: "Tổ chức"               },
+  };
+  const meta = TITLES[tab];
+
+  // Detail-view titles
+  let detailTitle = null;
+  if (detail?.type === "student") detailTitle = { title: D.getStudent(detail.id)?.name || "" };
+  if (detail?.type === "payment") detailTitle = { title: detail.id };
+  if (detail?.type === "class")   detailTitle = { title: D.getClass(detail.id)?.code || "" };
+  if (detail?.type === "permissions") detailTitle = { title: "Phân quyền · " + (D.getStaff(detail.id)?.name || "") };
+
+  return (
+    <div className="mgt-canvas" style={{
+      minHeight: "100vh", padding: 20,
+      paddingLeft: navCollapsed ? 30 : 14,
+      display: "flex", gap: navCollapsed ? 0 : 14, alignItems: "flex-start",
+      transition: "padding-left 320ms var(--ease-out), gap 320ms var(--ease-out)",
+    }}>
+      {!printMode && <SidebarEdgeToggle collapsed={navCollapsed} onToggle={() => setNavCollapsed(v => !v)}/>}
+      {!printMode && <Sidebar active={tab} onNav={goTab}
+               onQuickAdd={() => setAddStudent(true)}
+               unreadCount={unread}
+               collapsed={navCollapsed}/>}
+
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        {/* Detail back link sits ABOVE the title row */}
+        {detail && (
+          <button onClick={() => detail.from ? setDetail(detail.from) : setDetail(null)} style={{
+            background: "transparent", border: "none", color: "var(--fg-3)",
+            fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500, cursor: "pointer",
+            display: "inline-flex", alignItems: "center", gap: 6, padding: 0, alignSelf: "flex-start",
+            marginBottom: 8,
+          }}>
+            <Icon name="arrow-up" size={14} style={{ transform: "rotate(-90deg)" }}/>
+            {detail.from?.type === "class"     ? `Quay lại lớp ${D.getClass(detail.from.id)?.code || ""}` :
+             detail.from?.type === "student"   ? `Quay lại học viên ${D.getStudent(detail.from.id)?.name || ""}` :
+             detail.from?.type === "payment"   ? "Quay lại thanh toán" :
+             /* Fall back to the current tab — label the list the user came from. */
+             `Quay lại bảng ${meta.title.replace(/^Danh sách /, "")}`}
+          </button>
+        )}
+
+        <TopBar
+          title={detail ? detailTitle.title : meta.title}
+          right={
+            !detail && tab === "dashboard"
+              ? <Button variant="ghost" size="sm" icon="download" onClick={() => setReportPick(true)}>Báo cáo</Button>
+              : !detail && tab === "students"
+              ? <Button variant="primary" icon="plus" onClick={() => setAddStudent(true)}>Thêm học viên</Button>
+              : !detail && tab === "payments"
+              ? <Button variant="primary" icon="plus" onClick={() => setAddPayment({ open: true, studentId: null, amount: null })}>Ghi nhận thanh toán</Button>
+              : !detail && tab === "classes" && D.can("classes", "create")
+              ? <Button variant="primary" icon="plus" onClick={() => setAddClass(true)}>Tạo lớp</Button>
+              : null
+          }
+        />
+
+        <div style={{ position: "relative", flex: 1 }}>
+          {/* Each screen lives inside an error boundary so a single
+              broken render doesn't unmount the entire shell. resetKey
+              changes on tab/detail change so the boundary clears. */}
+          <ScreenErrorBoundary resetKey={`${tab}:${detail?.type || ""}:${detail?.id || ""}`}>
+            {/* Detail views (when set) */}
+            {detail?.type === "student" && (
+              <StudentDetail studentId={detail.id}
+                             initialTab={detail.tab}
+                             initialPaymentId={detail.paymentId}
+                             onBack={() => setDetail(null)}
+                             onAddPayment={(studentId, amount) => setAddPayment({ open: true, studentId, amount })}
+                             onOpenPayment={openPayment}/>
+            )}
+            {detail?.type === "payment" && (
+              <PaymentDetail paymentId={detail.id} onBack={() => setDetail(null)}
+                             onOpenStudent={openStudent}/>
+            )}
+            {detail?.type === "class" && (
+              <ClassDetail classId={detail.id} onBack={() => setDetail(null)}
+                           onOpenStudent={openStudent} isAdmin={D.can("classes", "update")}/>
+            )}
+            {detail?.type === "permissions" && (
+              <PermissionsScreen userId={detail.id} onBack={() => setDetail(null)}/>
+            )}
+
+            {/* List/screen views */}
+            {!detail && tab === "dashboard" && isAdmin && <DashboardScreen onOpenStudent={openStudent}/>}
+            {!detail && tab === "students"      && <StudentsScreen onOpenStudent={openStudent}
+                                                                   onAddStudent={() => setAddStudent(true)}/>}
+            {!detail && tab === "payments"      && <PaymentsScreen onOpenStudent={openStudent}
+                                                                   onAddPayment={() => setAddPayment({ open: true, studentId: null })}/>}
+            {!detail && tab === "classes"       && <ClassesScreen onOpenClass={openClass}
+                                                                  onAddClass={() => setAddClass(true)}
+                                                                  isAdmin={D.can("classes", "create")}/>}
+            {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenPermissions={openPermissions}/>}
+          </ScreenErrorBoundary>
+        </div>
+      </main>
+
+      <AddStudentModal open={addStudent} onClose={() => setAddStudent(false)}
+                       onSave={async (payload) => {
+                         try {
+                           const { docFiles, ...rest } = payload;
+                           const created = await D.api.createStudent(rest);
+                           // Then upload any captured files. Independent so a
+                           // failed upload doesn't block the rest — but surface
+                           // each failure via toast (was console.warn-only,
+                           // invisible to the user).
+                           await Promise.all(Object.entries(docFiles || {}).map(
+                             ([key, file]) => file ? D.api.uploadStudentDoc(created.id, key, file).catch(e => {
+                               console.warn('upload failed', key, e);
+                               if (window.MGT_TOAST) window.MGT_TOAST(`Lỗi tải tài liệu ${key}: ${e.message}`);
+                             }) : null
+                           ));
+                         } catch (e) {
+                           // Surface the create failure as a toast (was alert).
+                           if (window.MGT_TOAST) window.MGT_TOAST("Lỗi tạo học viên: " + e.message);
+                           else alert("Lỗi: " + e.message);
+                         }
+                       }}/>
+      <AddPaymentModal open={addPayment.open} defaultStudentId={addPayment.studentId}
+                       defaultAmount={addPayment.amount}
+                       onClose={() => setAddPayment({ open: false, studentId: null, amount: null })}
+                       onSave={async (payload) => {
+                         // Let errors propagate so AddPaymentModal can render
+                         // them inline (busy/err pattern). The previous
+                         // try/catch+alert+swallowed-upload-warn made create
+                         // and upload failures invisible to the user.
+                         const { bienLaiFile, ...rest } = payload;
+                         const created = await D.api.createPayment(rest);
+                         if (bienLaiFile) {
+                           try { await D.api.uploadBienLai(created.id, bienLaiFile); }
+                           catch (e) { throw new Error('Đã lưu thanh toán nhưng tải ảnh biên lai thất bại: ' + e.message); }
+                         }
+                       }}/>
+      <AddClassModal   open={addClass} onClose={() => setAddClass(false)}
+                       onSave={(payload) => D.api.createClass(payload)}/>
+      <ReportChoiceModal open={reportPick} onClose={() => setReportPick(false)}/>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------
+// ReportChoiceModal — three-way picker triggered by the "Báo cáo"
+// button on the Tổng quan screen. Two distinct outputs:
+//   • Trực quan  — the artistic dashboard PDF (charts + KPIs)
+//   • Số liệu    — a formal table-only PDF, last 7 days, signed footer
+//   • Excel      — same 7-day window, multi-sheet workbook
+// --------------------------------------------------------------------
+function ReportChoiceModal({ open, onClose }) {
+  const D = window.MGT_DATA;
+  const choose = async (fn) => { onClose && onClose(); await fn(); };
+  const Option = ({ icon, title, hint, onClick }) => (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "flex-start", gap: 14, padding: "14px 16px",
+      background: "var(--glass-2)", border: "1px solid var(--glass-stroke)",
+      borderRadius: 14, cursor: "pointer", textAlign: "left", color: "var(--fg-1)",
+      fontFamily: "var(--font-ui)", transition: "background 160ms var(--ease-out), border-color 160ms var(--ease-out)",
+    }}
+    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--glass-3)"; e.currentTarget.style.borderColor = "var(--glass-stroke-strong)"; }}
+    onMouseLeave={(e) => { e.currentTarget.style.background = "var(--glass-2)"; e.currentTarget.style.borderColor = "var(--glass-stroke)"; }}>
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+        background: "var(--ink-2)", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Icon name={icon} size={18}/>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{title}</span>
+        <span style={{ fontSize: 12, color: "var(--fg-3)", lineHeight: 1.45 }}>{hint}</span>
+      </div>
+    </button>
+  );
+  return (
+    <Modal open={open} onClose={onClose} width={520}
+           title="Xuất báo cáo"
+           subtitle="Chọn định dạng phù hợp với mục đích sử dụng">
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Option icon="chart" title="Trực quan (PDF)"
+                hint="Bảng tổng quan có biểu đồ và KPI — phù hợp để xem nhanh."
+                onClick={() => choose(() => D.api.downloadDashboardPdf())}/>
+        <Option icon="card" title="Số liệu (PDF)"
+                hint="Bảng số liệu chính thức 7 ngày gần nhất — phù hợp để lưu trữ, gửi chủ doanh nghiệp."
+                onClick={() => choose(() => D.api.downloadFormalReportPdf())}/>
+        <Option icon="download" title="Số liệu (Excel)"
+                hint="Workbook 6 sheet — cùng dữ liệu 7 ngày, tiện chỉnh sửa, lọc và in lại."
+                onClick={() => choose(() => D.api.downloadFormalReportXlsx())}/>
+      </div>
+    </Modal>
+  );
+}
+
+// --------------------------------------------------------------------
+// Boot — wait for window.MGT_DATA_READY (the data-loader.js fetch
+// promise) to resolve, then render <App/>. While loading, show a
+// minimal eyebrow-style "Đang tải dữ liệu…". On error, show the
+// message so devs can debug a missing/malformed CSV.
+// --------------------------------------------------------------------
+function Boot() {
+  const [ready, setReady] = React.useState(!!window.MGT_DATA);
+  const [error, setError] = React.useState(null);
+  React.useEffect(() => {
+    if (ready) return;
+    if (!window.MGT_DATA_READY) { setError(new Error("MGT_DATA_READY not found — data-loader.js failed to register")); return; }
+    window.MGT_DATA_READY.then(() => setReady(true)).catch(setError);
+  }, []);   // eslint-disable-line
+  if (error) {
+    return (
+      <div className="mgt-canvas" style={{
+        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+        flexDirection: "column", gap: 12, padding: 60,
+      }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--neon-pink)" }}>Lỗi tải dữ liệu</span>
+        <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-2)" }}>{String(error.message || error)}</span>
+      </div>
+    );
+  }
+  if (!ready) {
+    return (
+      <div className="mgt-canvas" style={{
+        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 60,
+      }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)" }}>Đang tải dữ liệu…</span>
+      </div>
+    );
+  }
+  return <App />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Boot />);

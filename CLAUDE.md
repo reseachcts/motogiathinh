@@ -1,137 +1,123 @@
-# Moto Gia Thinh — Claude Code Guidelines
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Vietnamese driving school management system. Multi-branch, two-role RBAC (admin/staff).
+Vietnamese driving school management system (Moto Gia Thịnh). Multi-branch, two-role (admin / staff). The frontend is the **frozen visual design system** copied bit-identical from `../motogiathinh2905-devandprod/webapp/` — see `frontend/CLAUDE.md` for the integration contract. The backend serves the sibling's `/api/*` contract natively (no /v1, no Bearer header, no RBAC permission table).
 
-- **Backend:** Python 3.14 + FastAPI, PostgreSQL 18, Redis 8.6, Celery
-- **Frontend:** React 18 + TypeScript, Ant Design 5, Tailwind CSS v4, Zustand, TanStack Query
-- **Storage:** MinIO (S3-compatible) for file uploads
-- **Infra:** Docker Compose (8 services)
+- **Backend:** Python 3.14 + FastAPI (async), PostgreSQL 18, Redis 8.6, Celery
+- **Frontend:** React 18 via Babel-in-browser (no build step), SF Pro Display/Text fonts, design tokens in `colors_and_type.css`. JSX files are FROZEN; only `data-loader.js` is the editable seam (it calls `/api/*`).
+- **OCR:** Separate microservice (Python 3.11 + VietOCR + Tesseract); Google Vision as primary, microservice as fallback
+- **Storage:** MinIO (S3-compatible) via boto3
+- **Infra:** Docker Compose
 
-## Architecture Rules
+## Common Commands
 
-- **Branch scoping:** Staff sees own branch only. Admin sees all. Use `branch_scope()` dependency in every service method.
-- **Two roles only:** `admin` (branch_id=NULL) and `staff` (branch_id set). No other roles.
-- **No online payments:** Payment recording is manual input only (cash, bank_transfer, momo, zalopay).
-- **Redis usage:** JWT refresh tokens, RBAC cache, atomic ID sequences (HV2024001 via INCR), dashboard cache (5min TTL).
-- **File uploads:** MinIO via boto3. Upload helper in `backend/app/core/storage.py`. Images stored as `students/{student_id}/{uuid}.{ext}`.
-
-## Backend
-
-### Structure
-```
-backend/app/
-  main.py              — FastAPI app, registers routers under /api/v1
-  config.py            — pydantic-settings (DB, Redis, S3, SMTP, etc.)
-  dependencies.py      — CurrentUser, DB type aliases
-  core/
-    security.py        — JWT + bcrypt (direct, not passlib)
-    permissions.py     — require_role(), require_admin(), branch_scope()
-    cache.py           — Redis wrapper + key constants
-    storage.py         — MinIO upload/delete via boto3
-    ocr.py             — Tesseract CCCD extraction (Vietnamese)
-  models/              — SQLAlchemy ORM (BaseModel with UUID pk, timestamps, soft delete)
-  schemas/             — Pydantic request/response schemas
-  services/            — Business logic (auth, student, payment, lead, report)
-  routers/
-    auth.py            — /auth (login, refresh, logout, me)
-    students.py        — /students (CRUD, OCR, image upload, QR)
-    payments.py        — /payments (record, plans, per-staff, overdue)
-    leads.py           — /leads (FB webhook, list, assign, convert)
-    reports.py         — /reports (dashboard, revenue)
-    admin.py           — /admin (user CRUD, admin-only)
+```bash
+docker compose up -d                                # start db, redis, minio, backend, frontend, nginx, ocr, celery
+docker compose exec backend alembic upgrade head    # schema migrations
+docker compose build backend frontend ocr           # rebuild after code changes
+docker compose logs -f backend                      # tail backend
+make migrate                                        # upload crawled data + run alembic + migrate.py on server
+make deploy / deploy-staging                        # rsync + docker up on VPS
 ```
 
-### Conventions
-- All models inherit from `BaseModel` in `app/database/base.py`
-- Use `requirements.txt` for dependencies (hatchling broken with Python 3.14)
-- Pydantic: avoid field names that shadow type imports (e.g. `on_date` not `date`)
-- Use `bcrypt` directly for hashing (passlib broken with bcrypt 5.x + Python 3.14)
-- JSONB columns need explicit `mapped_column(JSONB)` (SQLAlchemy can't infer `dict`)
-- Don't combine `Annotated[..., Depends()]` with `= Depends()` — use `dependencies=[...]` on route
-- Alembic async migrations via `alembic/env.py`
+Entrypoints (local): frontend `:3000` (direct) or `:8080` (top-level nginx). API docs at `:8000/api/docs`. MinIO console `:9001`.
 
-## Frontend
+## Architecture rules
 
-### Structure
+- **Single API surface:** `/api/*`. There is no `/api/v1/*` anymore. The frontend is a static bundle of `.jsx` + `.css` + fonts; the backend serves the JSON shape documented in `motogiathinh2905-devandprod/motogiathinh-design-system-template/project/BACKEND.md`.
+- **Auth:** HttpOnly cookie `mgt_session` (JWT inside, 14-day TTL). No Bearer header; no refresh tokens. `dependencies.get_current_user` reads the cookie. Login (`POST /api/auth/login`) returns `{user}` and sets the cookie. Logout clears it.
+- **Two roles:** `admin` (branch_id NULL) and `staff` (branch_id set). Admin endpoints depend on `AdminUser`. Branch scoping for staff is one helper: `scope_to_branch(user)` returns the branch UUID for staff, None for admin. There is no `UserPermission` table.
+- **Branch IDs on the wire are slugs**, not UUIDs. `branches.slug` (`br-1`, `br-2`, `br-3`) is assigned by the alembic migration in `created_at` order. Wire shapes resolve UUIDs to slugs via `resolve_branch_slug(s)`. Admin's null-branch resolves to the synthetic `admin-all` sentinel.
+- **Wire shape ≠ DB shape.** DB columns stay Vietnamese (`ten_hoc_vien`, `ngay_sinh`, `loai_bang_lai`); each router has a `_to_wire(row)` mapper that renames to English + formats dates as `dd/mm/yyyy[ HH:MM:SS]` + collapses the 8-class license enum to A/A1. Helpers live in `app/utils/dates.py`.
+- **Payments are immutable:** no UPDATE/DELETE. Corrections are compensating negative-amount entries. Payments have `kind ∈ {tuition, rental}`; rentals carry `vehicle_id` + `rental_rounds`.
+- **Derived fields are never on the wire:** `student.paid/balance/paymentStatus/noPayOnRegistration` and `class.status` are computed client-side from the payment event log + `class.openDate/examDate`. See `frontend/CLAUDE.md` § "Step 4 — derived fields are NEVER read from the wire".
+- **Notification auto-recompute** runs on Celery beat every 5 min (`app/tasks/notifications.py:recompute_auto_notifications`). Real auto-* upsert logic is a stub — full sibling-style recompute needs a `severity` column on notifications (deferred).
+- **File uploads:** MinIO via `core/storage.py:upload_bytes()`. Student docs land at `students/{id}/{key}-{ts}.{ext}`, biên lai at `payments/{id}/bienlai-{ts}.{ext}`. Served back via `GET /api/files/{kind}/{recId}/{filename}` (branch-scoped, path-traversal guarded).
+
+## Backend (`backend/app/`)
+
 ```
-frontend/src/
-  App.tsx              — Providers, theme injection, ConfigProvider
-  main.tsx             — Entry point (antd reset + tailwind)
-  app.css              — Tailwind + mobile overrides
-  router.tsx           — Routes (protected + lazy loaded)
-  vite-env.d.ts        — Vite types
-  theme/tokens.ts      — Dark/light CSS variable maps
-  store/               — authStore, branchStore, uiStore (Zustand + persist)
-  hooks/               — useAuth, useThemeColors
-  api/                 — client, auth, students, leads, payments, reports, admin
-  components/layout/   — AppLayout (responsive sidebar + mobile drawer)
-  pages/
-    auth/              — LoginPage
-    dashboard/         — DashboardPage, KpiCard, StaffCollectionSection, StudentStatusSection
-    students/          — List, Detail, Create, DetailDrawer, ImageSection, CccdUploadSection
-    leads/             — LeadListPage
-    payments/          — PaymentListPage
-    reports/           — ReportsPage
-    admin/             — AdminUsersPage
+main.py              — FastAPI app, mounts all routers under /api
+config.py            — pydantic-settings
+celery_app.py        — Celery + beat schedule
+dependencies.py      — get_current_user (cookie), require_admin, scope_to_branch, resolve_branch_slug(s)
+database/base.py     — BaseModel (UUID pk + TimestampMixin + SoftDeleteMixin)
+core/
+  security.py        — JWT (jose) + bcrypt + create_session_token / decode_token
+  cache.py           — Redis wrapper + CacheKeys (some keys dead since RBAC removal — cleanup pending)
+  storage.py         — MinIO upload_file / upload_bytes / get_object_bytes / delete_file
+  ocr.py             — Google Vision → ocr microservice fallback
+models/              — SQLAlchemy ORM (Vietnamese column names underneath the English wire)
+schemas/auth.py      — WireUser, LoginRequest/Response (only auth schemas remain)
+schemas/common.py    — PaginatedResponse (deprecated; not used by new routes)
+services/
+  audit_service.py   — log_action() helper (called by mutation routes)
+  auth_service.py    — login / change_password
+routers/             — auth, me, branches, accounts, classes, students, payments, fee_plans,
+                       promotions, teachers, vehicles, notifications, activity_log,
+                       constants, files, ocr, reports
+tasks/notifications.py — Celery jobs: session/payment/exam reminders + auto-notif heartbeat
+utils/               — id_generator (HV/BL/GD sequences via Redis INCR), dates (iso↔vn helpers)
 ```
 
-### Conventions
-- **Theming:** CSS variables (`var(--mgt-xxx)`) from `src/theme/tokens.ts`. Never hardcode theme colors.
-- **Charts:** Use `useThemeColors()` hook for `@ant-design/charts` fill/stroke (can't read CSS vars).
-- **Fonts:** Barlow + Barlow Condensed via Google Fonts. Set in ConfigProvider. Don't use Tailwind font utilities.
-- **State:** Zustand stores for client state, TanStack Query for server state.
-- **Theme toggle:** `useUiStore().themeMode` — dark/light, persisted in localStorage.
-- **Responsive:** Mobile sidebar as Drawer, `clamp()` padding, `scroll={{ x }}` on tables.
-- **Vietnamese labels** throughout all UI.
+## Conventions
+
+- **Wire-shape Pydantic classes live inline** in each router (e.g. `routers/students.py:StudentCreateForm`) — no centralized `wire/` directory.
+- Vietnamese DB columns translate at API edge via the `_to_wire(row, slug_map)` helper pattern in every router. Branch UUIDs always map through `slug_map` so the wire `branchId` is `br-1`/`br-2`/`br-3` or `admin-all`.
+- `dates.py` exports `iso_to_vn_date`, `iso_to_vn_datetime`, `vn_to_iso_date`, `license_to_wire/db`, `gender_to_wire/db`, `method_to_wire/db`.
+- IDs: PostgreSQL UUIDs internally; on the wire UUIDs are opaque strings except `branch.id` (slug). Display codes like `HV2024001` and `BL-2026-0001` are generated via `utils/id_generator.py` (Redis INCR).
+- 400-line max per file. The biggest router after Phase 5 is `routers/students.py` (~270 lines) which contains the doc upload routes too.
+- `Annotated[..., Depends()]` vs `= Depends()` — pick one form per parameter, don't mix.
 
 ## Docker
 
-```bash
-docker compose up -d                              # Start all services
-docker compose exec backend alembic upgrade head  # Run migrations
-docker compose build backend frontend             # Rebuild after changes
-```
-
-| Service | Port | Image |
+| Service | Port (host:container) | Image / Build |
 |---|---|---|
-| db | 5432 | postgres:18 |
-| redis | 6379 | redis:8.6.3-alpine |
+| db | 5432:5432 | postgres:18 (volume at /var/lib/postgresql) |
+| redis | 6379:6379 | redis:8.6.3-alpine |
 | minio | 9000/9001 | minio/minio:latest |
-| backend | 8000 | python:3.14-slim + tesseract-ocr-vie |
-| celery_worker | — | same as backend |
-| celery_beat | — | same as backend |
-| frontend | 3000 (→80) | node:20 build → nginx:alpine |
-| nginx | 80 | nginx:alpine |
+| backend | 8000:8000 | python:3.14-slim + tesseract + cairo/pango |
+| celery_worker / celery_beat | — | same image as backend |
+| ocr | — (internal :8082) | python:3.11-slim + VietOCR + PyTorch + tesseract |
+| frontend | 3000:80 | nginx:alpine static — no build step (Babel-in-browser) |
+| nginx | 8080:80 | nginx:alpine — top-level reverse proxy |
 
-- PostgreSQL 18 volume at `/var/lib/postgresql` (not `/data`)
-- Frontend nginx proxies `/api/` to `backend:8000`
+`frontend/nginx.conf` proxies `/api/` to `backend:8000` directly (uses Docker's embedded resolver so the container starts even when backend is down) and disables cache on `.html/.js/.jsx/.css` so source-file edits reflect on browser refresh.
 
-## Data Tools
+## Celery beat schedule
 
-- **Crawling:** `crawling/crawl.py` — crawls old Halozend site, saves to `crawling/data/*.json`
-- **Migration:** `data-migration/migrate.py` — migrates crawled data into PostgreSQL (idempotent, re-runnable)
-- Old system ID traceability via `old_system_id` column on migrated tables
+| Task | Cron (Asia/Ho_Chi_Minh) |
+|---|---|
+| `send_session_reminders` | hourly |
+| `send_payment_due_reminders` | 08:00 daily |
+| `send_exam_reminders` | 08:30 daily |
+| `mark_overdue_payments` | 01:00 daily |
+| `recompute_auto_notifications` | every 5 min |
 
-## Testing
+## Data migration
+
+- `crawling/crawl.py` scrapes legacy Halozend → JSON in `crawling/data/`.
+- `data-migration/migrate.py` imports into PostgreSQL. Idempotent (re-runnable). Adds `old_system_id` columns + the contract's new columns where missing (`SCHEMA_SQL` block).
+- Run via `make migrate` (uploads data + runs alembic + executes migrate.py inside backend container).
+
+## Local testing
 
 - Login: `admin@motogiathinh.vn` / `admin123`
-- API docs: `http://localhost:8000/api/docs`
 - Frontend: `http://localhost:3000`
-- Admin panel: `http://localhost:3000/admin`
+- API docs: `http://localhost:8000/api/docs`
 
-## Code Style
+## Common pitfalls
 
-- **Max 400 lines per file.** Split into smaller modules if exceeded.
-- English column names in database, Vietnamese labels in UI.
-- Use CSS variables for all theme colors — no hardcoded hex.
-
-## Common Pitfalls
-
-- Python 3.14 + passlib = broken. Always use `bcrypt` directly.
-- Python 3.14 + hatchling editable install = broken. Use `requirements.txt`.
-- Postgres 18 changed data dir layout — mount at `/var/lib/postgresql`.
-- `@tailwindcss/vite` requires `"type": "module"` in package.json.
-- MinIO bucket auto-created on first upload via `storage.py`.
-- Student phone fields may contain multiple numbers — `parse_phone_contacts()` in migration extracts family contacts to `student_contacts` table.
+- **Python 3.14 + passlib = broken.** Use `bcrypt` directly (already done in `core/security.py`).
+- **Python 3.14 + hatchling editable install = broken.** Stick to `requirements.txt`.
+- **Postgres 18** changed the data dir layout — volume mounts at `/var/lib/postgresql`.
+- **MinIO bucket** is auto-created on first upload via `storage.py`.
+- **JWT cookie is the only auth.** If a request 401s, the cookie likely expired (14 days) or wasn't sent (CORS / `credentials:'include'` missing). The frontend's `data-loader.js` already sets `credentials:'include'` on every fetch.
+- **Branch IDs on the wire are slugs.** Don't pass UUIDs back in mutation requests — accept both, normalize via the `_branch_id_from_slug` helper.
+- **Payment.payment_plan_id is nullable** (alembic `b1c2d3e4f5a6` relaxed it). Sibling contract has no payment_plan concept; new payments leave it NULL.
+- **The OCR parser lives in two places** (`backend/app/core/ocr.py` and `ocr_service/app.py`) — mirror parser changes.
+- **Audit logs don't commit themselves** — `log_action()` adds to the session; the caller must `db.commit()`.
+- **Notifications recompute is a stub.** Real auto-* upsert needs a `severity` column on notifications + nullable user_id (model tracks per-user delivery, sibling treats them as system-wide); follow-up alembic migration pending.

@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -72,6 +74,14 @@ class Student(BaseModel):
     # Audit
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     ngay_dang_ky: Mapped[date] = mapped_column(Date, nullable=False)
+    # Sibling-contract fields (added by alembic b1c2d3e4f5a6)
+    total_fee: Mapped[Decimal] = mapped_column("total_fee", Numeric(12, 2), nullable=False, default=0)
+    fee_plan_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("fee_plans.id"))
+    promotion_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("promotions.id"))
+    responsible_staff_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    profile_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    docs_gksk_url: Mapped[str | None] = mapped_column(String(500))
+    docs_don_de_nghi_url: Mapped[str | None] = mapped_column(String(500))
 
     # Relationships
     branch: Mapped["Branch"] = relationship("Branch", back_populates="students")

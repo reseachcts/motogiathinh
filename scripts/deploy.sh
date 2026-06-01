@@ -21,7 +21,6 @@ _load_var VPS_USER
 _load_var VPS_PASS
 _load_var VPS_PORT
 _load_var REMOTE_DIR
-_load_var VITE_API_BASE_URL
 _load_var LOCAL_ENV_FILE
 
 VPS_USER="${VPS_USER:-root}"
@@ -73,22 +72,9 @@ sync_to_server() {
 step "Preflight"
 [[ -z "${VPS_HOST:-}" ]] && die "VPS_HOST not set — add it to .deploy.env"
 command -v rsync  >/dev/null || die "rsync not found"
-command -v node   >/dev/null || die "node not found"
-command -v npm    >/dev/null || die "npm not found"
 command -v zip    >/dev/null || die "zip not found"
 remote "exit 0" || die "Cannot reach ${SSH_TARGET}"
 info "Target: ${SSH_TARGET}:${REMOTE_DIR}"
-
-# ── Build frontend ────────────────────────────────────────────────────────────
-step "Building frontend"
-VITE_API_BASE_URL="${VITE_API_BASE_URL:-/api/v1}"
-info "VITE_API_BASE_URL=${VITE_API_BASE_URL}"
-(
-  cd "${LOCAL_ROOT}/frontend"
-  npm install --silent
-  VITE_API_BASE_URL="${VITE_API_BASE_URL}" npm run build
-)
-info "Frontend built → frontend/dist/"
 
 # ── Prepare build dir ─────────────────────────────────────────────────────────
 step "Preparing build artifacts"
@@ -101,20 +87,9 @@ cp -r "${LOCAL_ROOT}/backend/." "${BUILD_DIR}/backend/"
 # OCR service: full source (docker builds it on server)
 cp -r "${LOCAL_ROOT}/ocr_service/." "${BUILD_DIR}/ocr_service/"
 
-# Frontend: pre-built dist + slim Dockerfile (skips npm install on server)
-cp -r "${LOCAL_ROOT}/frontend/dist"     "${BUILD_DIR}/frontend/dist"
-cp    "${LOCAL_ROOT}/frontend/nginx.conf" "${BUILD_DIR}/frontend/nginx.conf"
-FRONTEND_BUILD_TIME="$(date +%Y%m%d%H%M%S)"
-cat > "${BUILD_DIR}/frontend/Dockerfile" <<DOCKERFILE
-FROM nginx:alpine
-ARG BUILD_TIME=${FRONTEND_BUILD_TIME}
-RUN echo "\${BUILD_TIME}" > /dev/null
-RUN rm -rf /usr/share/nginx/html/*
-COPY dist/ /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-DOCKERFILE
+# Frontend: Babel-in-browser stack — copy raw source. nginx Dockerfile +
+# nginx.conf live inside frontend/ already; no build step.
+cp -r "${LOCAL_ROOT}/frontend/." "${BUILD_DIR}/frontend/"
 
 # Nginx and compose files
 cp "${LOCAL_ROOT}/nginx/nginx.conf"   "${BUILD_DIR}/nginx/nginx.conf"
@@ -201,6 +176,15 @@ remote_script <<SCRIPT
 cd "${REMOTE_DIR}"
 COMPOSE=\$(docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 \$COMPOSE ps
+SCRIPT
+
+# ── Frontend version sanity ───────────────────────────────────────────────────
+# Print the deployed data-loader.js line count + first-line header so future
+# stale-deploy bugs (like Phase 11) are visible in the deploy log.
+step "Frontend version"
+remote_script <<SCRIPT
+echo "  data-loader.js: \$(wc -l < ${REMOTE_DIR}/frontend/data-loader.js) lines"
+echo "  first line: \$(head -1 ${REMOTE_DIR}/frontend/data-loader.js)"
 SCRIPT
 
 echo -e "\n${G}${B}Deploy complete — ${SSH_TARGET}${N}"

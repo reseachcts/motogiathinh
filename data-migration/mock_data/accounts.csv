@@ -1,0 +1,8 @@
+id,name,role,branchId,phone,email,lastActive,active,restricted
+u-admin,Nguyễn Gia Huy,admin,br-1,090 555 0001,admin@motogiathinh.centersai,30/05 14:28,true,false
+u-1,Tuấn Thành,staff,br-1,090 555 0011,thanh@motogiathinh.vn,30/05 13:10,true,false
+u-2,Hoàng Nguyên,staff,br-1,090 555 0012,nguyen@motogiathinh.vn,30/05 11:55,true,false
+u-3,Gia Thịnh,staff,br-2,090 555 0013,thinh@motogiathinh.vn,30/05 10:42,true,false
+u-4,Tuấn Huy,staff,br-2,090 555 0014,huy@motogiathinh.vn,30/05 09:20,true,true
+u-5,Nhật Vượng,staff,br-3,090 555 0015,vuong@motogiathinh.vn,30/05 08:05,true,false
+u-6,Bạn Nhân Viên Mới,staff,br-3,090 555 0016,newstaff@motogiathinh.vn,29/05 17:30,true,false

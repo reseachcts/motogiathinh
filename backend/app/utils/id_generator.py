@@ -31,6 +31,16 @@ async def next_payment_id(branch_code: str, year: int | None = None) -> str:
     return f"GD{y}{seq:06d}"
 
 
+async def next_bien_lai_id(year: int | None = None) -> str:
+    """Sibling-format biên lai: BL-YYYY-NNNN."""
+    y = year or date.today().year
+    key = f"seq:bienlai:{y}"
+    seq = await cache.incr(key)
+    if seq == 1:
+        await cache.expire(key, 365 * 2 * 24 * 3600)
+    return f"BL-{y}-{seq:04d}"
+
+
 async def next_instructor_id(year: int | None = None) -> str:
     y = year or date.today().year
     key = f"seq:giaovien:{y}"

@@ -34,5 +34,9 @@ celery.conf.update(
             "task": "app.tasks.notifications.mark_overdue_payments",
             "schedule": crontab(hour=1, minute=0),
         },
+        "recompute-auto-notifications": {
+            "task": "app.tasks.notifications.recompute_auto_notifications",
+            "schedule": crontab(minute="*/5"),
+        },
     },
 )

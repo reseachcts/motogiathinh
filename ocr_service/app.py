@@ -187,8 +187,11 @@ def _recognize_lines(crops: list[tuple[int, Image.Image]]) -> list[str]:
 # ── CCCD field parser ─────────────────────────────────────────────────────────
 
 _MISREAD = str.maketrans({
-    "О": "O", "о": "o",   # Cyrillic O → Latin
-    "\u200b": "",           # zero-width space
+    "О": "O", "о": "o", "А": "A", "а": "a", "Е": "E", "е": "e",
+    "С": "C", "с": "c", "Р": "P", "р": "p", "Н": "H", "Т": "T",
+    "В": "B", "К": "K", "М": "M", "Х": "X", "У": "Y",
+    "Ё": "E", "ё": "e",
+    "​": "",
 })
 
 
@@ -196,75 +199,138 @@ def _clean(s: str) -> str:
     return s.translate(_MISREAD).strip()
 
 
-def _parse_cccd(lines: list[str]) -> dict:
-    result: dict = {
-        "cccd_number": None,
-        "full_name": None,
-        "date_of_birth": None,
-        "gender": None,
-        "address": None,
-        "issued_date": None,
-        "issued_place": None,
-        "raw_text": "\n".join(lines),
+_LABELS = {
+    "name":     re.compile(r"(H[ỌO]\s*(?:V[ÀA]\s*)?T[ÊE]N|HỌ\s*VÀ\s*TÊN|FULL\s*NAME|HỌ\s*TÊN)", re.I),
+    "dob":      re.compile(r"(NG[ÀA]Y\s*(?:TH[ÁA]NG\s*N[ĂA]M\s*)?SINH|DATE\s*OF\s*BIRTH|SINH|D\.\s*O\.\s*B\.?)", re.I),
+    "gender":   re.compile(r"(GI[ỚO]I\s*T[ÍI]NH|SEX|GENDER)", re.I),
+    "queQuan":  re.compile(r"(QU[ÊE]\s*QU[ÁA]N|PLACE\s*OF\s*ORIGIN)", re.I),
+    "addr":     re.compile(r"(N[ƠO]I\s*TH[ƯU][ỜO]NG\s*TR[ÚU]|TH[ƯU][ỜO]NG\s*TR[ÚU]|PLACE\s*OF\s*RESIDENCE)", re.I),
+    "issued":   re.compile(r"(NG[ÀA]Y\s*C[ẤA]P|DATE\s*OF\s*ISSUE)", re.I),
+    "issuedAt": re.compile(r"(N[ƠO]I\s*C[ẤA]P|PLACE\s*OF\s*ISSUE)", re.I),
+}
+_DATE_RE = re.compile(r"\b(\d{1,2})[/\-.\s](\d{1,2})[/\-.\s](\d{4})\b")
+_ID_RE = re.compile(r"\b(\d{12}|\d{9})\b")
+_EXPIRY_RE = re.compile(r"(C[ÓO]\s*GI[ÁA]\s*TR[ỊI]|EXPIR[YE]|DATE\s*OF\s*EXPIRY)", re.I)
+_NAME_TOKEN_RE = re.compile(r"^[A-Za-zÀ-ỹ\'\-]{2,}$")
+
+
+def _value_after_label(line, label_re):
+    m = label_re.search(line)
+    if not m: return ""
+    tail = line[m.end():].lstrip(": \t-")
+    if tail.startswith("/"):
+        cut = tail.find(":")
+        tail = tail[cut + 1:].lstrip(": \t-") if cut >= 0 else ""
+    return tail.strip()
+
+
+def _bad_name(s):
+    up = s.upper()
+    return bool(
+        re.search(
+            r"FULL\s*NAME|DATE|BIRTH|SEX|PLACE|NATIONAL|NG[ÀA]Y|N[ƠO]I|GI[ỚO]I|QU[ÊE]"
+            r"|C[ĂA]N\s*C[ƯU][ỚO]C|CCCD|CITIZEN|REPUBLIC|C[ỘO]NG\s*HO[ÀA]"
+            r"|CH[ỨU]NG\s*MINH|ID\s*CARD|H[ỘO]\s*KH[ẨA]U",
+            up,
+        ) or _DATE_RE.search(s) or _ID_RE.search(s)
+    )
+
+
+def _looks_like_label(s):
+    up = s.upper()
+    return any(p.search(up) for p in _LABELS.values()) or bool(_DATE_RE.search(s))
+
+
+def _looks_like_name(s):
+    s = s.strip().strip('"\'`*-:.,')
+    if _bad_name(s): return False
+    tokens = s.split()
+    if not (2 <= len(tokens) <= 6): return False
+    if not all(_NAME_TOKEN_RE.match(t) for t in tokens): return False
+    letters = [c for c in s if c.isalpha()]
+    if not letters: return False
+    return sum(1 for c in letters if c.isupper()) / len(letters) >= 0.6
+
+
+def _norm_date(m):
+    d, mo, y = m.group(1), m.group(2), m.group(3)
+    try: return f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
+    except ValueError: return None
+
+
+def _parse_cccd(lines):
+    text = "\n".join(_clean(l) for l in lines)
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    full = " ".join(lines)
+    result = {
+        "cccd_number": None, "full_name": None, "date_of_birth": None,
+        "gender": None, "address": None, "que_quan": None,
+        "issued_date": None, "issued_place": None, "raw_text": text,
     }
 
-    full_text = " ".join(_clean(l) for l in lines)
+    m = _ID_RE.search(full)
+    if m: result["cccd_number"] = m.group(1)
 
-    id_match = re.search(r"\b(\d{12}|\d{9})\b", full_text)
-    if id_match:
-        result["cccd_number"] = id_match.group(1)
-
-    dates = re.findall(r"(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})", full_text)
-
-    for i, raw_line in enumerate(lines):
-        line = _clean(raw_line)
+    for i, line in enumerate(lines):
         upper = line.upper()
+        next1 = lines[i + 1] if i + 1 < len(lines) else ""
+        next2 = lines[i + 2] if i + 2 < len(lines) else ""
 
-        if not result["full_name"] and re.search(r"H[ỌO].*T[ÊE]N|HO.*TEN", upper):
-            after = re.split(r":\s*", line, maxsplit=1)
-            candidate = after[1].strip() if len(after) > 1 and after[1].strip() else ""
-            if not candidate and i + 1 < len(lines):
-                candidate = _clean(lines[i + 1])
-            if candidate and not re.search(r"\d{4}", candidate) and not re.search(r"full name|date|birth|sex|place", candidate, re.I):
-                result["full_name"] = candidate
+        if not result["full_name"] and _LABELS["name"].search(upper):
+            cand = _value_after_label(line, _LABELS["name"]) or next1
+            cand = cand.strip().strip('"\'`*')
+            if cand and not _bad_name(cand):
+                result["full_name"] = cand
 
-        if not result["date_of_birth"] and re.search(r"NG[ÀA]Y.*SINH|SINH", upper):
-            m = re.search(r"(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})", line)
-            if m:
-                result["date_of_birth"] = _normalize_date(m.group(1))
+        if not result["date_of_birth"] and _LABELS["dob"].search(upper):
+            dm = _DATE_RE.search(line) or _DATE_RE.search(next1)
+            if dm: result["date_of_birth"] = _norm_date(dm)
 
-        if not result["gender"] and re.search(r"GI[ỚO]I.*T[ÍI]NH|GIOI.*TINH", upper):
-            if re.search(r"\bNAM\b", upper):
-                result["gender"] = "male"
-            elif re.search(r"N[Ữ\s]|NỮ|NU\b", upper):
-                result["gender"] = "female"
+        if not result["gender"] and _LABELS["gender"].search(upper):
+            ginput = (line + " " + next1).upper()
+            if re.search(r"\bNAM\b|\bMALE\b", ginput): result["gender"] = "male"
+            elif re.search(r"\bNỮ\b|\bNU\b|\bFEMALE\b", ginput): result["gender"] = "female"
 
-        if not result["address"] and re.search(r"TH[ƯU][ỜO]NG.*TR[ÚU]|N[ƠO]I.*TR[ÚU]|THUONG.*TRU", upper):
-            after = re.split(r":\s*", line, maxsplit=1)
-            addr = after[1].strip() if len(after) > 1 else ""
-            if (not addr or len(addr) < 20) and i + 1 < len(lines):
-                addr = (addr + " " + _clean(lines[i + 1])).strip()
-            if (len(addr) < 20) and i + 2 < len(lines):
-                addr = (addr + " " + _clean(lines[i + 2])).strip()
-            result["address"] = addr or None
+        if not result["que_quan"] and _LABELS["queQuan"].search(upper):
+            cand = _value_after_label(line, _LABELS["queQuan"]) or next1
+            if cand and next2 and not _looks_like_label(next2) and not _DATE_RE.search(next2):
+                cand = (cand + ", " + next2).strip(", ").strip()
+            result["que_quan"] = cand or None
 
-        if not result["issued_date"] and re.search(r"NG[ÀA]Y.*C[ẤA]P|NGAY.*CAP", upper):
-            m = re.search(r"(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})", line)
-            if m:
-                result["issued_date"] = _normalize_date(m.group(1))
+        if not result["address"] and _LABELS["addr"].search(upper):
+            cand = _value_after_label(line, _LABELS["addr"]) or next1
+            if cand and next2 and not _looks_like_label(next2) and not _DATE_RE.search(next2):
+                cand = (cand + ", " + next2).strip(", ").strip()
+            result["address"] = cand or None
 
-        if not result["issued_place"] and re.search(r"N[ƠO]I.*C[ẤA]P|NOI.*CAP", upper):
-            after = re.split(r":\s*", line, maxsplit=1)
-            place = after[1].strip() if len(after) > 1 and after[1].strip() else ""
-            if not place and i + 1 < len(lines):
-                place = _clean(lines[i + 1])
-            result["issued_place"] = place or None
+        if not result["issued_date"] and _LABELS["issued"].search(upper):
+            dm = _DATE_RE.search(line) or _DATE_RE.search(next1)
+            if dm: result["issued_date"] = _norm_date(dm)
 
-    if dates:
-        if not result["date_of_birth"]:
-            result["date_of_birth"] = _normalize_date(dates[0])
-        if not result["issued_date"] and len(dates) >= 2:
-            result["issued_date"] = _normalize_date(dates[-1])
+        if not result["issued_place"] and _LABELS["issuedAt"].search(upper):
+            cand = _value_after_label(line, _LABELS["issuedAt"]) or next1
+            if cand: result["issued_place"] = cand
+
+    date_hits = []
+    for m in _DATE_RE.finditer(full):
+        date_hits.append((_norm_date(m), full[max(0, m.start() - 30):m.end()]))
+    date_hits = [(d, ctx) for d, ctx in date_hits if d]
+
+    if not result["date_of_birth"] and date_hits:
+        if any(_LABELS["dob"].search(ln.upper()) for ln in lines):
+            result["date_of_birth"] = date_hits[0][0]
+    if not result["issued_date"]:
+        for d, ctx in reversed(date_hits):
+            if _EXPIRY_RE.search(ctx) or d == result["date_of_birth"]: continue
+            if _LABELS["issued"].search(ctx):
+                result["issued_date"] = d
+                break
+
+    if not result["full_name"]:
+        for line in lines:
+            if _looks_like_name(line):
+                result["full_name"] = line.strip().strip('"\'`*')
+                break
 
     return result
 
