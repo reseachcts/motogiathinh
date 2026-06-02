@@ -46,17 +46,12 @@ function AddStudentModal({ open, onClose, onSave }) {
         set("ngayCapCCCD", f.ngayCapCCCD);
         return next;
       });
-      const engine = out.engine || "vision";
-      const enginePrefix = engine === "microservice" ? "(VietOCR) " : "";
-      let msg;
-      if (applied.length) {
-        msg = `${enginePrefix}OCR đã điền ${applied.length} trường`;
-      } else if ((out.raw || "").trim()) {
-        msg = `${enginePrefix}OCR đọc được chữ nhưng không khớp mẫu CCCD — có thể là mặt sau hoặc ảnh không rõ. Hãy thử ảnh khác.`;
-      } else {
-        msg = `${enginePrefix}Không trích xuất được trường nào (engine: ${engine}) — kiểm tra lại ảnh hoặc nhập thủ công.`;
-      }
-      setOcrToast({ kind: applied.length ? "ok" : "warn", msg });
+      setOcrToast({
+        kind: applied.length ? "ok" : "warn",
+        msg: applied.length
+          ? `OCR đã điền ${applied.length} trường (${out.confidence ?? "?"}% confidence)`
+          : "Không trích xuất được trường nào — kiểm tra lại ảnh hoặc nhập thủ công.",
+      });
     } catch (e) {
       setOcrToast({ kind: "err", msg: "OCR thất bại: " + (e.message || e) });
     } finally {
@@ -263,10 +258,7 @@ function AddPaymentModal({ open, onClose, onSave, defaultStudentId, defaultAmoun
   const [bienLaiFile, setBienLaiFile] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
-  // Synchronous double-submit guard — React's `busy` state updates
-  // asynchronously, so a burst of .click()s can race past it. The ref
-  // check is synchronous and blocks duplicate POSTs.
-  const busyRef = React.useRef(false);
+  const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
 
   React.useEffect(() => {
     if (open) {
@@ -510,8 +502,7 @@ function AddClassModal({ open, onClose, onSave }) {
   const [form, setForm] = React.useState({ code: "", openDate: "", examDate: "", branchId: "" });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr]   = React.useState(null);
-  // Synchronous double-submit guard — see AddPaymentModal for rationale.
-  const busyRef = React.useRef(false);
+  const busyRef = React.useRef(false); // sync guard — React state batch means busyRef wins the race
   React.useEffect(() => {
     if (!open) setForm({ code: "", openDate: "", examDate: "", branchId: "" });
     if (open) { setBusy(false); setErr(null); busyRef.current = false; }

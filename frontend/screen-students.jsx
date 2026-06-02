@@ -32,7 +32,7 @@ function StudentsScreen({ onOpenStudent, onAddStudent }) {
   let pool = D.students.slice();
   if (filters.incomplete) pool = pool.filter(s => !s.profileComplete);
   if (filters.owing)      pool = pool.filter(s => s.balance > 0);
-  if (filters.today)      pool = pool.filter(s => s.createdAt.startsWith("30/05"));
+  if (filters.today)      pool = pool.filter(s => s.createdAt.startsWith(D.TODAY));
   if (adv.search) {
     const q = adv.search.toLowerCase();
     pool = pool.filter(s => (s.name + " " + s.phone + " " + s.maHV).toLowerCase().includes(q));
@@ -242,7 +242,7 @@ function StudentsScreen({ onOpenStudent, onAddStudent }) {
 // ====================================================================
 // Student Detail — pill tabs: Thông tin / Thanh toán
 // ====================================================================
-function StudentDetail({ studentId, initialTab, initialPaymentId, onBack, onOpenPayment, onAddPayment }) {
+function StudentDetail({ studentId, initialTab, initialPaymentId, initialRentalId, onBack, onOpenPayment, onAddPayment }) {
   const D = window.MGT_DATA;
   const s = D.getStudent(studentId);
   const [tab, setTab] = React.useState(initialTab || "info");
@@ -288,6 +288,7 @@ function StudentDetail({ studentId, initialTab, initialPaymentId, onBack, onOpen
       {tab === "payments" && (
         <StudentPaymentsTab student={s} payments={studentPayments}
                              initialPaymentId={initialPaymentId}
+                             initialRentalId={initialRentalId}
                              onAddPayment={onAddPayment}/>
       )}
     </div>
@@ -417,13 +418,30 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
       </div>
 
       {/* Bottom — Tài liệu (full width) */}
+      {/* === GUEST-QR-PACK begin — 6-slot grid (3 cols × 2 rows) with
+          CCCD mặt trước / sau / QR on row 1 and GKSK / Đơn / Thẻ 3×4
+          on row 2. Revert: change repeat(3,1fr)→repeat(4,1fr) and
+          drop the count denominator from 6→4. The slot list itself is
+          driven by /api/constants/profile-docs in entities.js. === */}
       <GlassCard padding={24}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)", letterSpacing: "-0.015em" }}>Tài liệu</h3>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.08em" }}>{docsFilledCount}/4 · kéo & thả vào ô</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.08em" }}>{docsFilledCount}/6 · kéo & thả vào ô</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <div style={{
+                 display: "grid",
+                 // minmax(0, 1fr) is critical: without the 0-min, a wide
+                 // child (long uppercase label with letterSpacing) can
+                 // expand a column past its equal share, breaking the
+                 // 3×2 layout into something like 2+4 or a horizontal
+                 // scroll. Explicit grid-auto-flow:row keeps the slot
+                 // order matching the spec (row1: cccd · cccd_back ·
+                 // cccd_qr / row2: gksk · donDeNghi · the3x4).
+                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                 gridAutoFlow: "row",
+                 gap: 12,
+               }}>
             {D.PROFILE_DOCS.map(doc => (
               <DocSlot key={doc.key} doc={doc} filled={docs[doc.key]}
                        previewUrl={s['docs_' + doc.key + '_url']}
@@ -454,11 +472,28 @@ function StudentInfoTab({ s, cls, staff, branch, feePlan, promo, docs, setDocs, 
           </div>
         </div>
       </GlassCard>
+      {/* === GUEST-QR-PACK end === */}
     </div>
   );
 }
 
-function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment }) {
+function StudentPaymentsTab({ student, payments, initialPaymentId, initialRentalId, onAddPayment }) {
+  // Wrapper render below assembles two stacked cards: the original
+  // payment ledger card + the new vehicle-rental card. We keep the
+  // payments logic in the inner Card component so this outer fn stays
+  // declarative.
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <StudentPaymentsCard student={student} payments={payments}
+                            initialPaymentId={initialPaymentId}
+                            onAddPayment={onAddPayment}/>
+      <StudentRentalsCard student={student} initialRentalId={initialRentalId}/>
+    </div>
+  );
+}
+
+// Original payment ledger card. Untouched aside from the wrapper rename.
+function StudentPaymentsCard({ student, payments, initialPaymentId, onAddPayment }) {
   // Sort ascending so cumulative snapshots reflect ledger order; display
   // newest-first for readability.
   const sortedAsc = React.useMemo(
@@ -610,69 +645,137 @@ function StudentPaymentsTab({ student, payments, initialPaymentId, onAddPayment 
           </div>
         )}
 
-        {/* Rentals — pay-on-the-spot, informational only. Does NOT count
-            toward the student's tuition balance. Operators record rentals
-            from the Phương tiện page; this section just exposes them on
-            the student's profile for cross-reference. */}
-        <StudentRentalsSection studentId={student.id}/>
       </div>
     </GlassCard>
   );
 }
 
 // --------------------------------------------------------------------
-// StudentRentalsSection — small "Thuê xe" list under the main payments.
-// Hidden entirely when the student has zero rentals so it doesn't add
-// noise to the common case.
+// StudentRentalsCard — separate GlassCard rendered BELOW the payment
+// card, sharing its visual idiom (2 SummaryStats on top, "Lịch sử thuê"
+// row with a "Ghi nhận lượt thuê" button, then a row list per rental).
+// Rentals stay informational here — no balance / outstanding logic, no
+// cumulative columns. The action button reuses the same RentVehicleModal
+// used on the Phương tiện page, with the student pre-locked.
 // --------------------------------------------------------------------
-function StudentRentalsSection({ studentId }) {
+function StudentRentalsCard({ student, initialRentalId }) {
   const D = window.MGT_DATA;
-  const rentals = D.rentalsForStudent(studentId);
-  if (rentals.length === 0) return null;
-  const sorted = [...rentals].sort((a, b) => b.createdAtMs - a.createdAtMs);
-  const total = rentals.reduce((s, r) => s + r.amount, 0);
+  const RentVehicleModal = window.RentVehicleModal;
+  const [rentOpen, setRentOpen] = React.useState(false);
+  const rentals = D.rentalsForStudent(student.id);
+  const sorted = React.useMemo(
+    () => [...rentals].sort((a, b) => b.createdAtMs - a.createdAtMs),
+    [rentals]
+  );
+  const totalAmount = rentals.reduce((s, r) => s + r.amount, 0);
   const totalRounds = rentals.reduce((s, r) => s + (r.rentalRounds || 0), 0);
+
+  // When the page is opened with `initialRentalId` (e.g. coming from the
+  // vehicle detail card via onOpenStudent), scroll that row into view and
+  // flash a brief cyan highlight so the user sees where they landed.
+  const rowRefs = React.useRef({});
+  const [flashId, setFlashId] = React.useState(initialRentalId || null);
+  React.useEffect(() => {
+    if (!initialRentalId) return;
+    const el = rowRefs.current[initialRentalId];
+    if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    setFlashId(initialRentalId);
+    const t = setTimeout(() => setFlashId(null), 2200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRentalId]);
   return (
-    <>
-      <Divider/>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>Thuê xe</h3>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            {rentals.length} lượt · {totalRounds} lượt thuê · {window.fmtVND(total)}
-          </span>
+    <GlassCard padding={24}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {/* Stat tiles — same 4-column grid as the payment card so each
+            tile occupies 1/4 of the row, matching SummaryStat sizing.
+            Right two slots stay empty (rentals only carry two metrics). */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14 }}>
+          <SummaryStat label="Lượt thi"      value={totalRounds}/>
+          <SummaryStat label="Tổng phí thuê" value={window.fmtVND(totalAmount)} color="var(--neon-lime)"/>
         </div>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-4)" }}>
-          Pay-on-the-spot — không tính vào học phí / công nợ.
-        </span>
-        <div style={{
-          display: "grid", gridTemplateColumns: "150px 1fr 80px 130px 1fr",
-          padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
-          fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
-        }}>
-          <span>Thời điểm</span><span>Xe</span>
-          <span style={{ textAlign: "right" }}>Lượt</span>
-          <span style={{ textAlign: "right" }}>Số tiền</span><span>Nhân viên</span>
+
+        <Divider/>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h3 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>Lịch sử thuê</h3>
+          <Button variant="primary" size="sm" icon="plus" onClick={() => setRentOpen(true)}>Ghi nhận lượt thuê</Button>
         </div>
-        {sorted.map((r, i) => {
-          const v = D.getVehicle(r.vehicleId);
-          const staff = D.getStaff(r.staffId);
-          return (
-            <div key={r.id} style={{
-              display: "grid", gridTemplateColumns: "150px 1fr 80px 130px 1fr",
-              padding: "10px 12px", gap: 12, alignItems: "center",
-              borderBottom: i < sorted.length - 1 ? "1px solid var(--ink-4)" : "none",
+
+        {sorted.length === 0 ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--fg-3)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+            Học viên chưa có lịch sử thuê.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {/* Header row — column widths copied from the payment grid so
+                the two tables line up visually. Cols by position:
+                  1 Thời điểm  2 Mã thuê  3 Số tiền  4 Lượt  5 Xe  6 Hình thức  7 Biên lai
+                Số tiền sits in col 3 (lime, right-aligned) to match the
+                payment card's Số tiền slot exactly. Lượt takes col 4
+                (mirrors the payment Đã thu right-aligned numeric slot),
+                Xe fills col 5 as left-aligned text. */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
+              padding: "10px 12px", gap: 12, borderBottom: "1px solid var(--ink-4)",
+              fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--fg-3)",
             }}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-2)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt}</span>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-1)" }}>{v ? `${v.name} · ${v.plate || "—"}` : r.vehicleId || "—"}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{r.rentalRounds || 0}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--neon-lime)", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{window.fmtVND(r.amount)}</span>
-              <span style={{ fontFamily: "var(--font-ui)", fontSize: 11, color: "var(--fg-3)" }}>{staff?.name || "—"}</span>
+              <span>Thời điểm</span>
+              <span>Mã thuê</span>
+              <span style={{ textAlign: "right" }}>Số tiền</span>
+              <span style={{ textAlign: "right" }}>Lượt</span>
+              <span style={{ textAlign: "left" }}>Xe</span>
+              <span>Hình thức</span>
+              <span style={{ textAlign: "center" }}>Biên lai</span>
             </div>
-          );
-        })}
+            {sorted.map((r, i) => {
+              const v = D.getVehicle(r.vehicleId);
+              const isLast = i === sorted.length - 1;
+              const isFlash = flashId === r.id;
+              return (
+                <div key={r.id}
+                     ref={el => { if (el) rowRefs.current[r.id] = el; }}
+                     style={{
+                       display: "grid", gridTemplateColumns: "130px 90px 1.1fr 1.1fr 1.1fr 100px 60px",
+                       padding: "14px 12px", gap: 12, alignItems: "center",
+                       borderBottom: isLast ? "none" : "1px solid var(--ink-4)",
+                       background: isFlash ? "color-mix(in oklab, var(--neon-cyan) 14%, transparent)" : "transparent",
+                       boxShadow: isFlash ? "inset 0 0 0 1px var(--neon-cyan), 0 0 22px var(--neon-cyan-haze)" : "none",
+                       transition: "background 600ms var(--ease-out), box-shadow 600ms var(--ease-out)",
+                     }}>
+                  {/* Thời điểm — date + time stacked, same style as the payment row */}
+                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 2 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg-1)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ").slice(0, 2).join(" ")}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", fontVariantNumeric: "tabular-nums" }}>{r.createdAt.split(" ")[2] || ""}</span>
+                  </div>
+                  {/* Mã thuê */}
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-1)", fontWeight: 600, letterSpacing: "0.04em",
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.id}</span>
+                  {/* Số tiền — lime, same column slot as the payment row's Số tiền */}
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--neon-lime)", fontWeight: 600 }}>+{window.fmtVND(r.amount)}</span>
+                  {/* Lượt */}
+                  <span style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--fg-1)", fontWeight: 600 }}>{r.rentalRounds || 0}</span>
+                  {/* Xe — abbreviated reference (Xe số N) per spec, not the full model name */}
+                  <span style={{ textAlign: "left", fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--fg-1)",
+                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v ? `Xe số ${v.plate || "—"}` : (r.vehicleId || "—")}</span>
+                  {/* Hình thức */}
+                  <span style={{ fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--fg-2)" }}>{r.method}</span>
+                  {/* Biên lai */}
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <BienLaiMark hasPhoto={r.bienLaiPhoto}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </>
+
+      {RentVehicleModal && (
+        <RentVehicleModal open={rentOpen} onClose={() => setRentOpen(false)}
+                          defaultStudentId={student.id}/>
+      )}
+    </GlassCard>
   );
 }
 

@@ -199,26 +199,14 @@
 
   async function boot() {
     let me = null;
-    let mePerms = {};
-    try {
-      const meResp = await api('/me');
-      me = meResp.user;
-      mePerms = meResp.permissions || {};
-    } catch {
-      me = await showLoginOverlay();
-      try { const reMe = await api('/me'); mePerms = reMe.permissions || {}; } catch { mePerms = {}; }
-    }
+    try { me = (await api('/me')).user; } catch { me = await showLoginOverlay(); }
 
-    // Activity log is the only resource whose read permission is commonly
-    // revoked for staff. If the user lacks it the endpoint 403s — swallow
-    // so boot still succeeds; the Lịch sử tab is hidden by D.can() anyway.
-    const safeActivityLog = () => api('/activity-log').catch(() => []);
     const [branches, accounts, feePlans, promotions, teachers, vehicles,
            classesRaw, studentsRaw, paymentsRaw, notifications, activityLog, profileDocs] =
       await Promise.all([
         api('/branches'), api('/accounts'), api('/fee-plans'), api('/promotions'),
         api('/teachers'), api('/vehicles'), api('/classes'), api('/students'),
-        api('/payments'), api('/notifications'), safeActivityLog(),
+        api('/payments'), api('/notifications'), api('/activity-log'),
         api('/constants/profile-docs'),
       ]);
 
@@ -240,7 +228,7 @@
 
     const students = studentsRaw.map(s => ({
       ...s, createdAtMs: parseDT(s.createdAt),
-      docs: { cccd: !!s.docs_cccd, gksk: !!s.docs_gksk, donDeNghi: !!s.docs_donDeNghi, the3x4: !!s.docs_the3x4 },
+      docs: { cccd: !!s.docs_cccd, cccd_back: !!s.docs_cccd_back, cccd_qr: !!s.docs_cccd_qr, gksk: !!s.docs_gksk, donDeNghi: !!s.docs_donDeNghi, the3x4: !!s.docs_the3x4 },
     }));
     // Split the wire payload by kind. Existing rows that pre-date the
     // schema migration come back as kind=undefined → coerce to 'tuition'
@@ -322,7 +310,7 @@
 
     function patchStudentIn(raw) {
       const s = { ...raw, createdAtMs: parseDT(raw.createdAt),
-        docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 } };
+        docs: { cccd: !!raw.docs_cccd, cccd_back: !!raw.docs_cccd_back, cccd_qr: !!raw.docs_cccd_qr, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 } };
       students.push(s); studentsById.set(s.id, s);
       pushTo(studentsByClassId, s.classId, s); pushTo(studentsByBranchId, s.branchId, s);
       recomputeDerived(s);
@@ -361,23 +349,6 @@
       currentUserId: me.id,
       get currentUser() { return accountsById.get(this.currentUserId) || me; },
 
-      // Permission system (per-staff CRUD) — populated from /api/me.
-      // Admin role bypasses; `dashboard` is admin-only pseudo-resource.
-      permissions: mePerms,
-      can(resource, verb) {
-        if (this.currentUser?.role === 'admin') return true;
-        if (resource === 'dashboard') return false;
-        const short = (verb || '').length === 1 ? verb : (verb || '')[0];
-        return !!(this.permissions?.[resource]?.[short]);
-      },
-      async refetchPermissions() {
-        try {
-          const r = await api('/me');
-          this.permissions = r.permissions || {};
-          this._bump?.();
-        } catch {}
-      },
-
       getStaff:     (id) => accountsById.get(id),
       getBranch:    (id) => branchesById.get(id),
       getClass:     (id) => classesById.get(id),
@@ -385,6 +356,8 @@
       getFeePlan:   (id) => feePlansById.get(id),
       getPromotion: (id) => promotionsById.get(id),
       getVehicle:   (id) => vehiclesById.get(id),
+      // Returns branch options array for select dropdowns — avoids duplicating D.branches.map(...) in every tab.
+      getBranchOpts() { return this.branches.map(b => ({ id: b.id, label: b.name })); },
       paymentsForStudent: (id) => paymentsByStudentId.get(id) || [],
       rentalsForStudent:  (id) => rentalsByStudentId.get(id)  || [],
       rentalsForVehicle:  (id) => rentalsByVehicleId.get(id)  || [],
@@ -496,25 +469,6 @@
         createAccount(p)     { return this._crud('create', '/accounts',  accounts,   accountsById,   { body: p }); },
         updateAccount(id, p) { return this._crud('update', '/accounts',  accounts,   accountsById,   { id, body: p }); },
         resetPassword(id, newPassword) { return this._crud('post', '/accounts', accounts, null, { id, sub: '/reset-password', body: { newPassword } }); },
-        async deleteAccount(id) {
-          await api('/accounts/' + encodeURIComponent(id), { method: 'DELETE' });
-          const idx = accounts.findIndex(a => a.id === id);
-          if (idx >= 0) accounts.splice(idx, 1);
-          accountsById.delete(id);
-          MGT_DATA._bump();
-          return { ok: true };
-        },
-        async getAccountPermissions(userId) {
-          return api('/accounts/' + encodeURIComponent(userId) + '/permissions');
-        },
-        async updateAccountPermissions(userId, body) {
-          const out = await api('/accounts/' + encodeURIComponent(userId) + '/permissions', { method: 'PUT', body });
-          if (userId === MGT_DATA.currentUserId) {
-            MGT_DATA.permissions = out || {};
-          }
-          MGT_DATA._bump();
-          return out;
-        },
         createFeePlan(p)     { return this._crud('create', '/fee-plans', feePlans,   feePlansById,   { body: { ...p, amount: parseInt(p.amount, 10) || 0 } }); },
         updateFeePlan(id, p) { return this._crud('update', '/fee-plans', feePlans,   feePlansById,   { id, body: 'amount' in p ? { ...p, amount: parseInt(p.amount, 10) || 0 } : p }); },
         createPromotion(p)     { return this._crud('create', '/promotions', promotions, promotionsById, { body: { ...p, discount: parseInt(p.discount, 10) || 0 }, normalize: _normPromo }); },
@@ -597,13 +551,47 @@
           if (!res.ok) throw new Error('ocr_failed: ' + res.status);
           return res.json();
         },
+        // Re-pull /api/accounts + /api/classes and patch the in-memory
+        // maps. Used by the guest kiosk when opening the add dialog so
+        // the footer chip reflects admin's latest assignedClassId
+        // without a full page reload. Promise.all is atomic — if either
+        // endpoint fails, no in-memory state is mutated.
+        async refreshMe() {
+          const [accs, fresh] = await Promise.all([api('/accounts'), api('/classes')]);
+          if (Array.isArray(accs)) {
+            for (const a of accs) accountsById.set(a.id, a);
+          }
+          if (Array.isArray(fresh)) {
+            classes.length = 0; classesById.clear();
+            for (const raw of fresh) {
+              const c = { ...raw, _openMs: parseDT(raw.openDate), _examMs: parseDT(raw.examDate) };
+              setClassStatus(c);
+              classes.push(c); classesById.set(c.id, c);
+            }
+          }
+          this._bump();
+        },
+        // Scan QR code on a Vietnamese CCCD image. Returns { fields, raw }
+        // on success; throws an Error whose .code property carries the
+        // server's structured error (qr_unreadable / qr_unrecognized / etc).
+        async cccdQr(file) {
+          const fd = new FormData(); fd.append('file', file);
+          const res = await fetch(API + '/ocr/cccd-qr', { method: 'POST', credentials: 'include', body: fd });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const e = new Error(body.message || 'qr_failed');
+            e.code = body.error || 'qr_failed';
+            throw e;
+          }
+          return body;
+        },
         async updateStudent(id, patch) {
           const raw = await api('/students/' + encodeURIComponent(id), { method: 'PATCH', body: patch });
           const ex = studentsById.get(id);
           if (ex) {
             Object.assign(ex, raw, {
               createdAtMs: parseDT(raw.createdAt),
-              docs: { cccd: !!raw.docs_cccd, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
+              docs: { cccd: !!raw.docs_cccd, cccd_back: !!raw.docs_cccd_back, cccd_qr: !!raw.docs_cccd_qr, gksk: !!raw.docs_gksk, donDeNghi: !!raw.docs_donDeNghi, the3x4: !!raw.docs_the3x4 },
             });
             recomputeDerived(ex);
           }
@@ -640,3 +628,7 @@
 
   window.MGT_DATA_READY = boot().catch(err => { console.error('[data-loader] boot failed:', err); throw err; });
 })();
+
+// toggleInArray — shared immutable toggle helper used across filter chips.
+// Returns arr with item removed if present, or [...arr, item] if not.
+window.toggleInArray = (arr, item) => arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];

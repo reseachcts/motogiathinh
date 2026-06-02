@@ -58,7 +58,7 @@ function Sidebar({ active, onNav, onQuickAdd, unreadCount, collapsed }) {
 
       {/* Nav */}
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.filter(it => it.id !== "dashboard" || window.MGT_DATA.can("dashboard", "r")).map(it => {
+        {NAV_ITEMS.map(it => {
           const isActive = active === it.id;
           const showBadge = it.id === "notifications" && unreadCount > 0;
           return (

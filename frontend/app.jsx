@@ -2,6 +2,8 @@
 // App — routing between screens + modals + detail views
 // ====================================================================
 
+const TAB_BY_DETAIL = { student: "students", class: "classes", payment: "payments" };
+
 // ScreenErrorBoundary — isolates a single screen's render failure so a
 // crash in one tab doesn't take down the whole shell (sidebar, topbar,
 // other screens). Renders a minimal Vietnamese error card with a
@@ -46,16 +48,19 @@ class ScreenErrorBoundary extends React.Component {
 function App() {
   // ThemeProvider wraps the whole app so theme toggles instantly
   // propagate to any component reading `useTheme()` / `useBranchTones()`.
+  // Guest accounts get the simplified mobile-style shell; admin/staff
+  // get the full desktop CRM.
+  const role = window.MGT_DATA?.currentUser?.role;
   return (
     <ThemeProvider>
-      <AppRoot/>
+      {role === 'guest' ? <GuestApp/> : <AppRoot/>}
     </ThemeProvider>
   );
 }
 
 function AppRoot() {
   const D = window.MGT_DATA;
-  const isAdmin = D.can("dashboard", "r");  // admin-only pseudo-resource
+  const isAdmin = D.currentUser.role === "admin";
 
   // Re-render whenever data-loader fires 'mgt:datachanged' (after any
   // successful create/update/delete). The frozen screens read D.<arrays>
@@ -75,10 +80,16 @@ function AppRoot() {
     && new URLSearchParams(window.location.search).get("print") === "dashboard";
 
   // route: { tab: "students"|"payments"|..., detail: null | { type, id } }
-  // Staff don't have the dashboard tab (admin-only); they land on Học viên.
-  const [tab, setTab]       = React.useState(isAdmin ? "dashboard" : "students");
+  const [tab, setTab]       = React.useState("dashboard");
   const [detail, setDetail] = React.useState(null);
   const [navCollapsed, setNavCollapsed] = React.useState(!!printMode);
+  // Lifted state for the Tổ chức screen — needed because clicking a
+  // vehicle's rental row swaps detail to a student profile, unmounting
+  // OrganizationScreen. Holding these at App level lets the back-button
+  // from a vehicle-sourced student profile return to the exact same
+  // Phương tiện sub-tab with the same vehicle card still open.
+  const [orgTab, setOrgTab]                 = React.useState("branches");
+  const [orgVehicleSelectedId, setOrgVehSel] = React.useState(null);
 
   // modals
   const [addStudent, setAddStudent] = React.useState(false);
@@ -88,12 +99,39 @@ function AppRoot() {
 
   const unread = D.notifications.filter(n => !n.read).length;
 
-  // Navigation helpers
+  // Navigation helpers — openStudent flips the top-level tab to
+  // "students" so the sidebar reflects what's actually being viewed
+  // (the student profile), regardless of which list the user came from.
   const goTab = (id) => { setTab(id); setDetail(null); };
-  const openStudent = (id, opts) => setDetail({ type: "student", id, ...(opts || {}) });
+  const openStudent = (id, opts) => { setTab("students"); setDetail({ type: "student", id, ...(opts || {}) }); };
   const openPayment = (id) => setDetail({ type: "payment", id });
   const openClass   = (id) => { setTab("classes"); setDetail({ type: "class", id }); };
-  const openPermissions = (id) => setDetail({ type: "permissions", id });
+
+  // Back-button handler. Honours the optional `from` marker on the
+  // current detail object and ALSO switches the top-level tab so the
+  // sidebar nav lights up the screen actually rendered.
+  //
+  // Forward path that triggered this: Tổ chức → branch card → class
+  // detail → student detail. Back path the user wants:
+  //   Học viên detail → class detail (tab=classes) → class list page.
+  // Without the tab switch below, the back-restored class detail would
+  // render under tab=students with the wrong sidebar highlight.
+  const goBack = () => {
+    const f = detail?.from;
+    if (f?.type === "vehicle") {
+      setOrgTab("vehicles");
+      setOrgVehSel(f.id);
+      setTab("organization");
+      setDetail(null);
+      return;
+    }
+    if (f && TAB_BY_DETAIL[f.type]) {
+      setTab(TAB_BY_DETAIL[f.type]);
+      setDetail({ type: f.type, id: f.id });
+      return;
+    }
+    setDetail(null);
+  };
 
   const TITLES = {
     dashboard:    { title: "Tổng quan"            },
@@ -110,7 +148,6 @@ function AppRoot() {
   if (detail?.type === "student") detailTitle = { title: D.getStudent(detail.id)?.name || "" };
   if (detail?.type === "payment") detailTitle = { title: detail.id };
   if (detail?.type === "class")   detailTitle = { title: D.getClass(detail.id)?.code || "" };
-  if (detail?.type === "permissions") detailTitle = { title: "Phân quyền · " + (D.getStaff(detail.id)?.name || "") };
 
   return (
     <div className="mgt-canvas" style={{
@@ -128,14 +165,15 @@ function AppRoot() {
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         {/* Detail back link sits ABOVE the title row */}
         {detail && (
-          <button onClick={() => detail.from ? setDetail(detail.from) : setDetail(null)} style={{
+          <button onClick={goBack} style={{
             background: "transparent", border: "none", color: "var(--fg-3)",
             fontFamily: "var(--font-ui)", fontSize: 13, fontWeight: 500, cursor: "pointer",
             display: "inline-flex", alignItems: "center", gap: 6, padding: 0, alignSelf: "flex-start",
             marginBottom: 8,
           }}>
             <Icon name="arrow-up" size={14} style={{ transform: "rotate(-90deg)" }}/>
-            {detail.from?.type === "class"     ? `Quay lại lớp ${D.getClass(detail.from.id)?.code || ""}` :
+            {detail.from?.type === "vehicle"   ? `Quay lại Xe số ${detail.from.plate || ""}` :
+             detail.from?.type === "class"     ? `Quay lại lớp ${D.getClass(detail.from.id)?.code || ""}` :
              detail.from?.type === "student"   ? `Quay lại học viên ${D.getStudent(detail.from.id)?.name || ""}` :
              detail.from?.type === "payment"   ? "Quay lại thanh toán" :
              /* Fall back to the current tab — label the list the user came from. */
@@ -152,7 +190,7 @@ function AppRoot() {
               ? <Button variant="primary" icon="plus" onClick={() => setAddStudent(true)}>Thêm học viên</Button>
               : !detail && tab === "payments"
               ? <Button variant="primary" icon="plus" onClick={() => setAddPayment({ open: true, studentId: null, amount: null })}>Ghi nhận thanh toán</Button>
-              : !detail && tab === "classes" && D.can("classes", "create")
+              : !detail && tab === "classes" && isAdmin
               ? <Button variant="primary" icon="plus" onClick={() => setAddClass(true)}>Tạo lớp</Button>
               : null
           }
@@ -168,6 +206,7 @@ function AppRoot() {
               <StudentDetail studentId={detail.id}
                              initialTab={detail.tab}
                              initialPaymentId={detail.paymentId}
+                             initialRentalId={detail.rentalId}
                              onBack={() => setDetail(null)}
                              onAddPayment={(studentId, amount) => setAddPayment({ open: true, studentId, amount })}
                              onOpenPayment={openPayment}/>
@@ -178,23 +217,23 @@ function AppRoot() {
             )}
             {detail?.type === "class" && (
               <ClassDetail classId={detail.id} onBack={() => setDetail(null)}
-                           onOpenStudent={openStudent} isAdmin={D.can("classes", "update")}/>
-            )}
-            {detail?.type === "permissions" && (
-              <PermissionsScreen userId={detail.id} onBack={() => setDetail(null)}/>
+                           onOpenStudent={openStudent} isAdmin={isAdmin}/>
             )}
 
             {/* List/screen views */}
-            {!detail && tab === "dashboard" && isAdmin && <DashboardScreen onOpenStudent={openStudent}/>}
+            {!detail && tab === "dashboard"     && <DashboardScreen onOpenStudent={openStudent}/>}
             {!detail && tab === "students"      && <StudentsScreen onOpenStudent={openStudent}
                                                                    onAddStudent={() => setAddStudent(true)}/>}
             {!detail && tab === "payments"      && <PaymentsScreen onOpenStudent={openStudent}
                                                                    onAddPayment={() => setAddPayment({ open: true, studentId: null })}/>}
             {!detail && tab === "classes"       && <ClassesScreen onOpenClass={openClass}
                                                                   onAddClass={() => setAddClass(true)}
-                                                                  isAdmin={D.can("classes", "create")}/>}
+                                                                  isAdmin={isAdmin}/>}
             {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
-            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenPermissions={openPermissions}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenStudent={openStudent}
+                                                                        tab={orgTab} onTabChange={setOrgTab}
+                                                                        vehicleSelectedId={orgVehicleSelectedId}
+                                                                        onVehicleSelectedIdChange={setOrgVehSel}/>}
           </ScreenErrorBoundary>
         </div>
       </main>
