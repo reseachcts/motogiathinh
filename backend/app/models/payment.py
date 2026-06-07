@@ -68,8 +68,8 @@ class Payment(BaseModel):
     branch_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("branches.id"), nullable=False, index=True
     )
-    payment_plan_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("payment_plans.id"), nullable=False, index=True
+    payment_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_plans.id"), nullable=True, index=True
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
@@ -79,8 +79,8 @@ class Payment(BaseModel):
     phuong_thuc: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), nullable=False)
     loai_thanh_toan: Mapped[str | None] = mapped_column(String(50))
     # Per-staff tracking
-    collected_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    collected_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -94,11 +94,17 @@ class Payment(BaseModel):
     payment_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     so_bien_lai: Mapped[str | None] = mapped_column(String(50))
     ghi_chu: Mapped[str | None] = mapped_column(Text)
+    # Sibling-contract fields (added by alembic b1c2d3e4f5a6)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default="tuition")
+    vehicle_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("vehicles.id"))
+    rental_rounds: Mapped[int | None] = mapped_column()
+    so_bien_lai_id: Mapped[str | None] = mapped_column(String(20), unique=True)
+    bien_lai_photo_url: Mapped[str | None] = mapped_column(String(500))
 
     # Relationships
     student: Mapped["Student"] = relationship("Student", back_populates="payments")
     payment_plan: Mapped["PaymentPlan"] = relationship("PaymentPlan", back_populates="payments")
-    collector: Mapped["User"] = relationship("User", foreign_keys=[collected_by])
+    collector: Mapped["User | None"] = relationship("User", foreign_keys=[collected_by])
     gateway_logs: Mapped[list["PaymentGatewayLog"]] = relationship(
         "PaymentGatewayLog", back_populates="payment"
     )

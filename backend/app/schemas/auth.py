@@ -1,9 +1,16 @@
+"""Auth request / response schemas for the cookie-based session API.
+
+LoginRequest is the only POST body; LoginResponse + WireUser are the
+canonical wire shapes consumed by the frontend data-loader.
+"""
+
 import uuid
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
-from app.models.enums import RoleName
-from app.schemas.common import BaseSchema
+from app.models.user import User
+from app.utils.dates import iso_to_vn_datetime
 
 
 class LoginRequest(BaseModel):
@@ -11,35 +18,47 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class UserOut(BaseSchema):
-    id: uuid.UUID
-    email: str
-    phone: str | None
-    full_name: str | None
-    role: RoleName
-    branch_id: uuid.UUID | None
-    is_active: bool
-
-
 class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+    currentPassword: str
+    newPassword: str
 
 
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+class WireUser(BaseModel):
+    id: str
+    name: str
+    role: str  # "admin" | "staff"
+    branchId: Optional[str]
+    email: str
+    phone: Optional[str]
+    lastActive: Optional[str]  # "dd/mm/yyyy HH:MM:SS"
+    active: bool
+
+    @classmethod
+    def from_user(cls, u: User, branch_id_override: Optional[str] = None) -> "WireUser":
+        """branch_id_override lets the caller pass a slug (`br-1` etc.)
+        instead of the raw UUID — the Sidebar looks the value up in
+        `D.getBranch(user.branchId)` against /api/branches which returns slugs.
+        For admin users without a DB branch_id, the caller should pass the
+        first real branch's slug as override (see resolve_branch_slug).
+        """
+        role = u.role.value if hasattr(u.role, "value") else str(u.role)
+        if branch_id_override is not None:
+            branchId: Optional[str] = branch_id_override
+        elif u.branch_id:
+            branchId = str(u.branch_id)
+        else:
+            branchId = None
+        return cls(
+            id=str(u.id),
+            name=u.full_name or (u.email.split("@")[0] if u.email else "—"),
+            role=role,
+            branchId=branchId,
+            email=u.email,
+            phone=u.phone,
+            lastActive=iso_to_vn_datetime(u.last_login_at),
+            active=u.is_active,
+        )
 
 
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
+class LoginResponse(BaseModel):
+    user: WireUser

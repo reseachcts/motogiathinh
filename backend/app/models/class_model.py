@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -7,12 +8,13 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    Numeric,
     SmallInteger,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
@@ -38,6 +40,9 @@ class Class(BaseModel):
         Enum(ClassStatus), nullable=False, default=ClassStatus.upcoming, index=True
     )
     phong_hoc: Mapped[str | None] = mapped_column(String(100))
+    hoc_phi: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    zalo_group_link: Mapped[str | None] = mapped_column(String(500))
+    lich_hoc: Mapped[list | None] = mapped_column(JSONB)
     ghi_chu: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
 

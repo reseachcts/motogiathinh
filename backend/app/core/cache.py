@@ -35,9 +35,14 @@ class CacheKeys:
     INSTRUCTOR_BUSY = "sched:instructor:{id}:{date}"
     VEHICLE_BUSY = "sched:vehicle:{id}:{date}"
     # Student cache
+    STUDENT_DETAIL = "student:{id}:detail"
     STUDENT_SCHEDULE = "student:{id}:schedule"
     STUDENT_PAYMENTS = "student:{id}:payments"
     STUDENT_DOCS_COMPLETE = "student:{id}:docs_complete"
+    # Leads
+    LEADS_UNCLAIMED = "lead:unclaimed:{branch_id}"
+    # Analytics
+    ANALYTICS = "report:analytics:{branch_id}:{year}"
     # Sequences (atomic INCR)
     STUDENT_SEQ = "seq:hocvien:{year}"
     CLASS_SEQ = "seq:lop:{year}:{branch}"

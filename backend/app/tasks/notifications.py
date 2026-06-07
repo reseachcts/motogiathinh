@@ -1,10 +1,15 @@
 """
-Celery tasks for the 5 notification triggers:
-1. session_reminder    — 24h before session
-2. payment_due         — 3 days before due_date
-3. exam_reminder       — 3 days before exam
-4. certificate_ready   — when certificate status becomes 'issued'
-5. document_incomplete — on enrollment if docs missing
+Celery tasks: legacy 5 triggers + sibling-contract auto-notifications.
+
+The sibling's auto-recompute pass (every 5 min + after each write) maintains
+deterministic-id Notification rows of two kinds:
+  - auto-payment-{student_id} — 50%/0% paid in an active class
+  - auto-doc-{student_id}     — profile_complete = false
+The current backend's Notification model is structurally different (per-user
+delivery list, not branch-wide derived rows), so this recompute is a stub
+for now — it logs a heartbeat. Real wiring requires either schema additions
+(severity column, nullable user_id) or a separate `auto_notifications` table.
+Track that follow-up; the schedule itself is in place.
 """
 import asyncio
 from datetime import date, timedelta
@@ -169,3 +174,14 @@ async def _mark_overdue_payments():
         for plan in result.scalars().all():
             plan.payment_status = PaymentStatus.overdue
         await db.commit()
+
+
+@celery.task(name="app.tasks.notifications.recompute_auto_notifications")
+def recompute_auto_notifications():
+    """Sibling-contract auto-recompute: 0%/50% paid + incomplete profile.
+
+    Heartbeat stub — full implementation needs schema additions (severity
+    column on notifications, nullable user_id, deterministic upsert key).
+    """
+    print("[notifications] recompute heartbeat (auto-* upsert pending schema)")
+    return {"status": "noop_stub"}

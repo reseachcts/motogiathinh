@@ -1,0 +1,3 @@
+id,name,appliesTo_csv,discount
+promo-hssv,HSSV,fee-a,100000
+promo-link,Liên kết,fee-a|fee-a1,50000

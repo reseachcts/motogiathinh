@@ -1,31 +1,26 @@
-import uuid
-from datetime import date
+"""Reports — dashboard PDF + data.{pdf,xlsx}.
 
-from fastapi import APIRouter, Query
+Skeleton: returns 501 for now. Real implementation uses weasyprint
+(already a project dep) against Jinja2 templates + openpyxl for xlsx.
+"""
 
-from app.core.permissions import branch_scope
-from app.dependencies import DB, CurrentUser
-from app.services.report_service import ReportService
+from fastapi import APIRouter, HTTPException
+
+from app.dependencies import CurrentUser
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
-@router.get("/dashboard")
-async def dashboard(
-    current_user: CurrentUser,
-    db: DB,
-    branch_id: uuid.UUID | None = Query(None),
-):
-    effective_branch = branch_scope(current_user, branch_id)
-    return await ReportService(db).get_dashboard(effective_branch, current_user)
+@router.get("/dashboard.pdf")
+async def dashboard_pdf(current_user: CurrentUser):
+    raise HTTPException(501, "dashboard_pdf_not_implemented")
 
 
-@router.get("/revenue")
-async def revenue(
-    current_user: CurrentUser,
-    db: DB,
-    year: int = Query(default=date.today().year),
-    branch_id: uuid.UUID | None = Query(None),
-):
-    effective_branch = branch_scope(current_user, branch_id)
-    return await ReportService(db).get_revenue_monthly(year, effective_branch)
+@router.get("/data.pdf")
+async def data_pdf(current_user: CurrentUser):
+    raise HTTPException(501, "data_pdf_not_implemented")
+
+
+@router.get("/data.xlsx")
+async def data_xlsx(current_user: CurrentUser):
+    raise HTTPException(501, "data_xlsx_not_implemented")

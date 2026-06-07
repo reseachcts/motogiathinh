@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -8,11 +9,12 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    Numeric,
     SmallInteger,
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import BaseModel
@@ -65,11 +67,21 @@ class Student(BaseModel):
     # QR / contact shortcuts
     qr_code_url: Mapped[str | None] = mapped_column(String(500))
     zalo_number: Mapped[str | None] = mapped_column(String(20))
+    # Transfer flag
+    is_transfer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Notes
     ghi_chu: Mapped[str | None] = mapped_column(Text)
     # Audit
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     ngay_dang_ky: Mapped[date] = mapped_column(Date, nullable=False)
+    # Sibling-contract fields (added by alembic b1c2d3e4f5a6)
+    total_fee: Mapped[Decimal] = mapped_column("total_fee", Numeric(12, 2), nullable=False, default=0)
+    fee_plan_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("fee_plans.id"))
+    promotion_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("promotions.id"))
+    responsible_staff_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    profile_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    docs_gksk_url: Mapped[str | None] = mapped_column(String(500))
+    docs_don_de_nghi_url: Mapped[str | None] = mapped_column(String(500))
 
     # Relationships
     branch: Mapped["Branch"] = relationship("Branch", back_populates="students")
@@ -79,6 +91,9 @@ class Student(BaseModel):
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="student")
     payment_plans: Mapped[list["PaymentPlan"]] = relationship(
         "PaymentPlan", back_populates="student"
+    )
+    contacts: Mapped[list["StudentContact"]] = relationship(
+        "StudentContact", back_populates="student"
     )
     documents: Mapped[list["StudentDocument"]] = relationship(
         "StudentDocument", back_populates="student"
@@ -92,6 +107,21 @@ class Student(BaseModel):
     exam_registrations: Mapped[list["ExamRegistration"]] = relationship(
         "ExamRegistration", back_populates="student"
     )
+
+
+class StudentContact(BaseModel):
+    __tablename__ = "student_contacts"
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(100))
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    relation: Mapped[str | None] = mapped_column(String(50))  # cha, mẹ, vợ, chồng, etc.
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    student = relationship("Student", back_populates="contacts")
 
 
 class StudentHealthCheck(BaseModel):
@@ -139,7 +169,7 @@ class StudentDocument(BaseModel):
     )
     file_url: Mapped[str] = mapped_column(String(500), nullable=False)
     expiry_date: Mapped[date | None] = mapped_column(Date)
-    ocr_raw_data: Mapped[dict | None] = mapped_column()
+    ocr_raw_data: Mapped[dict | None] = mapped_column(JSONB)
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
 
     student: Mapped["Student"] = relationship("Student", back_populates="documents")

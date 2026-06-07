@@ -16,7 +16,10 @@ class Branch(Base, TimestampMixin):
     ten_chi_nhanh: Mapped[str] = mapped_column(String(200), nullable=False)
     dia_chi: Mapped[str | None] = mapped_column(String(500))
     so_dien_thoai: Mapped[str | None] = mapped_column(String(20))
+    email: Mapped[str | None] = mapped_column(String(200))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    manager_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    slug: Mapped[str | None] = mapped_column(String(10), unique=True, nullable=True)
 
     # Relationships
     users: Mapped[list["User"]] = relationship("User", back_populates="branch")
