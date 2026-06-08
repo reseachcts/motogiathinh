@@ -99,7 +99,6 @@ function AppRoot() {
   const openStudent = (id, opts) => setDetail({ type: "student", id, ...(opts || {}) });
   const openPayment = (id) => setDetail({ type: "payment", id });
   const openClass   = (id) => { setTab("classes"); setDetail({ type: "class", id }); };
-  const openPermissions = (id) => setDetail({ type: "permissions", id });
 
   const TITLES = {
     dashboard:    { title: "Tổng quan"            },
@@ -116,7 +115,6 @@ function AppRoot() {
   if (detail?.type === "student") detailTitle = { title: D.getStudent(detail.id)?.name || "" };
   if (detail?.type === "payment") detailTitle = { title: detail.id };
   if (detail?.type === "class")   detailTitle = { title: D.getClass(detail.id)?.code || "" };
-  if (detail?.type === "permissions") detailTitle = { title: "Phân quyền · " + (D.getStaff(detail.id)?.name || "") };
 
   return (
     <div className="mgt-canvas" style={{
@@ -186,9 +184,6 @@ function AppRoot() {
               <ClassDetail classId={detail.id} onBack={() => setDetail(null)}
                            onOpenStudent={openStudent} isAdmin={D.can("classes", "update")}/>
             )}
-            {detail?.type === "permissions" && (
-              <PermissionsScreen userId={detail.id} onBack={() => setDetail(null)}/>
-            )}
 
             {/* List/screen views */}
             {!detail && tab === "dashboard" && isAdmin && <DashboardScreen onOpenStudent={openStudent}/>}
@@ -200,7 +195,7 @@ function AppRoot() {
                                                                   onAddClass={() => setAddClass(true)}
                                                                   isAdmin={D.can("classes", "create")}/>}
             {!detail && tab === "notifications" && <NotificationsScreen onOpenStudent={openStudent}/>}
-            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenPermissions={openPermissions}/>}
+            {!detail && tab === "organization"  && <OrganizationScreen onOpenClass={openClass} onOpenStudent={openStudent}/>}
           </ScreenErrorBoundary>
         </div>
       </main>

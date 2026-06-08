@@ -10,7 +10,6 @@ from app.core.security import decode_token
 from app.database.session import get_db
 from app.models.enums import RoleName
 from app.models.user import User
-from app.models.user_permission import UserPermission
 
 SESSION_COOKIE = "mgt_session"
 
@@ -152,39 +151,34 @@ ALL_RESOURCES = (
 )
 
 
+def _all(v: bool) -> dict[str, dict[str, bool]]:
+    return {res: {"c": v, "r": v, "u": v, "d": v} for res in ALL_RESOURCES}
+
+
+def permissions_for_role(role: RoleName) -> dict[str, dict[str, bool]]:
+    """FIXED permission set per role — there is NO per-account customization.
+    Each role is one immutable set, not editable and not different per account.
+      - admin / staff → full CRUD on every resource (admin-only mutations are
+        separately gated by the AdminUser dependency).
+      - collaborator (CTV) → students create+read only.
+      - guest (kiosk)       → students create+read+update (update = doc upload);
+        per-row ownership is enforced in the route handlers.
+    """
+    if role in (RoleName.admin, RoleName.staff):
+        return _all(True)
+    out = _all(False)
+    if role == RoleName.collaborator:
+        out["students"] = {"c": True, "r": True, "u": False, "d": False}
+    elif role == RoleName.guest:
+        out["students"] = {"c": True, "r": True, "u": True, "d": False}
+    return out
+
+
 async def load_permissions(
-    db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, dict[str, bool]]:
-    """Per-request {resource: {c, r, u, d}} map. Admin → synthetic all-true.
-    Staff → loaded from user_permissions; missing rows default to all-false."""
-    if user.role == RoleName.admin:
-        return {res: {"c": True, "r": True, "u": True, "d": True} for res in ALL_RESOURCES}
-    if user.role == RoleName.collaborator:
-        # CTV: fixed map — students create+read only; everything else denied.
-        out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
-        out["students"] = {"c": True, "r": True, "u": False, "d": False}
-        return out
-    if user.role == RoleName.guest:
-        # Guest kiosk: students create+read+update (update enables doc upload/edit);
-        # per-row ownership (responsible_staff_id) is enforced in the route handlers.
-        out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
-        out["students"] = {"c": True, "r": True, "u": True, "d": False}
-        return out
-    out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
-    result = await db.execute(
-        select(UserPermission).where(
-            UserPermission.user_id == user.id,
-            UserPermission.deleted_at.is_(None),
-        )
-    )
-    for row in result.scalars().all():
-        if row.resource in out:
-            out[row.resource] = {
-                "c": row.can_create, "r": row.can_read,
-                "u": row.can_update, "d": row.can_delete,
-            }
-    return out
+    """Per-request {resource: {c, r, u, d}} map — purely role-derived (fixed)."""
+    return permissions_for_role(user.role)
 
 
 PermissionMap = Annotated[dict[str, dict[str, bool]], Depends(load_permissions)]

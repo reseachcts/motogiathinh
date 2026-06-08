@@ -549,7 +549,7 @@
       currentUserId: me.id,
       get currentUser() { return accountsById.get(this.currentUserId) || me; },
 
-      // Permission system (per-staff CRUD) — populated from /api/me.
+      // Fixed per-role permission set from /api/me (no per-account editing).
       // Admin role bypasses; `dashboard` is admin-only pseudo-resource.
       permissions: mePerms,
       can(resource, verb) {
@@ -557,13 +557,6 @@
         if (resource === 'dashboard') return false;
         const short = (verb || '').length === 1 ? verb : (verb || '')[0];
         return !!(this.permissions?.[resource]?.[short]);
-      },
-      async refetchPermissions() {
-        try {
-          const r = await api('/me');
-          this.permissions = r.permissions || {};
-          this._bump?.();
-        } catch {}
       },
 
       getStaff:     (id) => accountsById.get(id),
@@ -702,17 +695,6 @@
           accountsById.delete(id);
           MGT_DATA._bump();
           return { ok: true };
-        },
-        async getAccountPermissions(userId) {
-          return api('/accounts/' + encodeURIComponent(userId) + '/permissions');
-        },
-        async updateAccountPermissions(userId, body) {
-          const out = await api('/accounts/' + encodeURIComponent(userId) + '/permissions', { method: 'PUT', body });
-          if (userId === MGT_DATA.currentUserId) {
-            MGT_DATA.permissions = out || {};
-          }
-          MGT_DATA._bump();
-          return out;
         },
         createFeePlan(p)     { return this._crud('create', '/fee-plans', feePlans,   feePlansById,   { body: { ...p, amount: parseInt(p.amount, 10) || 0 } }); },
         updateFeePlan(id, p) { return this._crud('update', '/fee-plans', feePlans,   feePlansById,   { id, body: 'amount' in p ? { ...p, amount: parseInt(p.amount, 10) || 0 } : p }); },

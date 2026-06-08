@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from app.dependencies import (
-    DB, CurrentUser, load_permissions, load_user_assignments, resolve_branch_slug,
+    DB, CurrentUser, load_user_assignments, permissions_for_role, resolve_branch_slug,
 )
 from app.schemas.auth import WireUser
 
@@ -13,7 +13,7 @@ router = APIRouter(tags=["me"])
 @router.get("/me")
 async def me(current_user: CurrentUser, db: DB):
     branch_slug = await resolve_branch_slug(db, current_user)
-    perms = await load_permissions(db, current_user)
+    perms = permissions_for_role(current_user.role)  # fixed per-role set
     assignments = (await load_user_assignments(db, [current_user.id])).get(current_user.id, {})
     return {
         "user": WireUser.from_user(

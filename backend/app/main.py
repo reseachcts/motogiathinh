@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import (
-    account_permissions,
     accounts,
     activity_log,
     address,
@@ -62,7 +61,6 @@ app.include_router(me.router, prefix=API_PREFIX)
 app.include_router(address.router, prefix=API_PREFIX)
 app.include_router(branches.router, prefix=API_PREFIX)
 app.include_router(accounts.router, prefix=API_PREFIX)
-app.include_router(account_permissions.router, prefix=API_PREFIX)
 app.include_router(fee_plans.router, prefix=API_PREFIX)
 app.include_router(promotions.router, prefix=API_PREFIX)
 app.include_router(teachers.router, prefix=API_PREFIX)
