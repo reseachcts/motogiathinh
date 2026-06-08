@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "sync": "node build.mjs && cap sync",
+    "patch-native": "node patch-native.mjs",
+    "sync": "node build.mjs && cap sync && node patch-native.mjs",
     "android": "node build.mjs && cap sync android && cap open android",
-    "ios": "node build.mjs && cap sync ios && cap open ios"
+    "ios": "node build.mjs && cap sync ios && node patch-native.mjs && cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",

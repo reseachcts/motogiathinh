@@ -34,23 +34,32 @@ npx cap open android         # → Android Studio → Run / Build APK
 cd android && ./gradlew assembleDebug
 #   → app/build/outputs/apk/debug/app-debug.apk
 ```
-Permissions (CAMERA, media) are merged from the Camera/ML-Kit plugins.
+No CAMERA permission is declared, and none is needed: `@capacitor/camera`
+delegates capture to the system camera app via `ACTION_IMAGE_CAPTURE` (it only
+requires CAMERA at runtime if you explicitly declare it). The QR decode reads a
+file (`readBarcodesFromImage`), so it needs no camera permission either.
 
-### Offline ML Kit model (recommended)
-By default ML Kit downloads the model via Google Play Services on first use.
-To **bundle** it (fully offline from install), add to `android/app/build.gradle`
-`dependencies { … }`:
-```gradle
-implementation 'com.google.mlkit:barcode-scanning:17.3.0'
-```
+### Offline ML Kit model — already bundled ✔
+The QR scanner is **already fully offline**. `@capacitor-mlkit/barcode-scanning`
+v6.2.0 ships the **bundled** model (`com.google.mlkit:barcode-scanning:17.2.0`),
+and the app uses `readBarcodesFromImage`, which uses it. The `.tflite` models are
+inside the APK (`assets/mlkit_barcode_models/`) — verified. Nothing to add.
+(The unbundled Play-Services artifact `play-services-mlkit-barcode-scanning` is
+**not** used.)
 
 ## iOS (build on macOS)
-Prereqs: macOS + Xcode + CocoaPods.
+Prereqs: macOS + **Xcode** (full app, not just Command-Line-Tools) + CocoaPods
+(`sudo gem install cocoapods`).
 ```bash
+npm run build
+npx cap add ios              # if ios/ doesn't exist yet
+npm run patch-native         # injects camera/photo Info.plist usage strings
 cd ios/App && pod install && cd -
 npx cap open ios             # → Xcode → run, or export .ipa for Sideloadly
 ```
-`Info.plist` already declares camera + photo-library usage strings.
+`npm run ios` chains build → sync → patch-native → open. The camera +
+photo-library usage strings are injected by **`patch-native.mjs`** (a fresh
+`cap add ios` does NOT include them — without them iOS crashes on camera access).
 
 ## Notes / known follow-ups
 - `src/config.js` API base is a placeholder until the backend is deployed.

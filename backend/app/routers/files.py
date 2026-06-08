@@ -53,6 +53,10 @@ async def get_file(kind: str, rec_id: str, filename: str, current_user: CurrentU
                 ok = res.first() is not None
             if not ok:
                 raise HTTPException(403, "wrong_branch")
+        elif current_user.role == RoleName.guest and kind == "students":
+            # Guest kiosk: only files of students this operator registered.
+            if owner.responsible_staff_id != current_user.id:
+                raise HTTPException(403, "wrong_branch")
         elif owner.branch_id != current_user.branch_id:
             raise HTTPException(403, "wrong_branch")
     key = f"{kind}/{rec_id}/{filename}"

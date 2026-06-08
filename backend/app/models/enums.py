@@ -93,6 +93,7 @@ class RoleName(str, enum.Enum):
     admin = "admin"
     staff = "staff"
     collaborator = "collaborator"
+    guest = "guest"  # single-class kiosk operator (ported from sync-frontend-2026-06)
 
 
 class LeadSource(str, enum.Enum):

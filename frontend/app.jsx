@@ -46,9 +46,10 @@ class ScreenErrorBoundary extends React.Component {
 function App() {
   // ThemeProvider wraps the whole app so theme toggles instantly
   // propagate to any component reading `useTheme()` / `useBranchTones()`.
-  // Collaborators (CTV) get the standalone vertical portal (GuestApp)
-  // instead of the admin shell entirely.
-  const isCtv = window.MGT_DATA.currentUser.role === "collaborator";
+  // Collaborators (CTV) and guests (kiosk operators) get the standalone
+  // vertical portal (GuestApp) instead of the admin shell entirely.
+  const _role = window.MGT_DATA.currentUser.role;
+  const isCtv = _role === "collaborator" || _role === "guest";
   return (
     <ThemeProvider>
       {isCtv ? <GuestApp/> : <AppRoot/>}
@@ -59,7 +60,7 @@ function App() {
 function AppRoot() {
   const D = window.MGT_DATA;
   const isAdmin = D.can("dashboard", "r");  // admin-only pseudo-resource
-  const isCtv = D.currentUser.role === "collaborator";  // restricted web app
+  const isCtv = D.currentUser.role === "collaborator" || D.currentUser.role === "guest";  // restricted web app
 
   // Re-render whenever data-loader fires 'mgt:datachanged' (after any
   // successful create/update/delete). The frozen screens read D.<arrays>

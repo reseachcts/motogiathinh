@@ -5,16 +5,14 @@ Wire shape uses English field names; DB columns are Vietnamese underneath
 """
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.core.ocr import extract_cccd_info
-from app.core.storage import upload_bytes
 from app.dependencies import DB, CurrentUser, accessible_class_ids, require_permission
 from app.models.branch import Branch
 from app.models.class_model import Class, ClassEnrollment
@@ -114,6 +112,10 @@ async def _student_accessible(db, current_user, student_id: uuid.UUID) -> bool:
             ).limit(1)
         )
         return res.first() is not None
+    if current_user.role == RoleName.guest:
+        # Guest kiosk: only students this operator registered.
+        s = await db.get(Student, student_id)
+        return bool(s) and s.responsible_staff_id == current_user.id
     # staff: branch scoping, exactly as before
     if not current_user.branch_id:
         return False
@@ -129,7 +131,10 @@ async def list_students(current_user: CurrentUser, db: DB):
     query = select(Student).where(Student.deleted_at.is_(None)).order_by(Student.created_at.desc())
     # Collaborator (CTV): only students enrolled in an assigned ACTIVE class.
     # Staff: branch-scoped exactly as before (all classes). Admin: everything.
-    if current_user.role == RoleName.collaborator:
+    if current_user.role == RoleName.guest:
+        # Guest kiosk: only students this operator registered.
+        query = query.where(Student.responsible_staff_id == current_user.id)
+    elif current_user.role == RoleName.collaborator:
         acc = await accessible_class_ids(db, current_user)
         if not acc:
             return []
@@ -212,11 +217,17 @@ async def create_student(
     _perm: Annotated[None, Depends(require_permission("students", "create"))] = None,
 ):
     f = data.form
-    # Resolve the class — branch_id is derived from it
-    try:
-        cls_uuid = uuid.UUID(f.classId)
-    except ValueError:
-        raise HTTPException(400, "invalid_classId")
+    # Resolve the class — branch_id is derived from it.
+    # Guest kiosk: force the operator's single assigned class (ignore submitted classId).
+    if current_user.role == RoleName.guest:
+        if not current_user.assigned_class_id:
+            raise HTTPException(400, "guest_no_class")
+        cls_uuid = current_user.assigned_class_id
+    else:
+        try:
+            cls_uuid = uuid.UUID(f.classId)
+        except ValueError:
+            raise HTTPException(400, "invalid_classId")
     cls = await db.get(Class, cls_uuid)
     if not cls:
         raise HTTPException(400, "invalid_classId")
@@ -244,9 +255,11 @@ async def create_student(
     fp_amount = Decimal(fp.amount) if fp else Decimal(DEFAULT_FEES.get(f.licence, 0))
     pr_disc = Decimal(pr.gia_tri) if (pr and getattr(pr, "loai_khuyen_mai", "fixed") == "fixed") else Decimal(0)
     total_fee = max(Decimal(0), fp_amount - pr_disc)
-    # Resolve responsible staff
+    # Resolve responsible staff. Guest kiosk: the operator owns the students it creates.
     resp_uuid = None
-    if f.responsibleStaffId:
+    if current_user.role == RoleName.guest:
+        resp_uuid = current_user.id
+    elif f.responsibleStaffId:
         try: resp_uuid = uuid.UUID(f.responsibleStaffId)
         except ValueError: resp_uuid = None
 
@@ -374,93 +387,5 @@ async def update_student(
     return _to_wire(s, slug_map)
 
 
-# ── Docs upload / delete ────────────────────────────────────────────────────
-DOC_KEYS = {"cccd", "cccdBack", "cccdQR", "gksk", "donDeNghi", "the3x4", "bangLaiFront", "bangLaiBack"}
-
-
-@router.post("/{student_id}/docs/{key}", status_code=201)
-async def upload_doc(
-    student_id: str,
-    key: str,
-    file: UploadFile = File(...),
-    current_user: CurrentUser = None,
-    db: DB = None,
-    _perm: Annotated[None, Depends(require_permission("students", "update"))] = None,
-):
-    if key not in DOC_KEYS:
-        raise HTTPException(400, "invalid_key")
-    try: s_uuid = uuid.UUID(student_id)
-    except ValueError: raise HTTPException(400, "invalid_id")
-    s = await db.get(Student, s_uuid)
-    if not s: raise HTTPException(404, "student_not_found")
-    if not await _student_accessible(db, current_user, s.id):
-        raise HTTPException(403, "class_not_accessible")
-    content = await file.read()
-    if len(content) > 8 * 1024 * 1024:
-        raise HTTPException(400, "file_too_large")
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower() or "bin"
-    object_key = f"students/{student_id}/{key}-{int(datetime.now(timezone.utc).timestamp()*1000)}.{ext}"
-    url = upload_bytes(object_key, content, content_type=file.content_type or "application/octet-stream")
-    if key == "cccd":      s.cmnd_front_url = url
-    elif key == "cccdBack": s.cmnd_back_url = url
-    elif key == "cccdQR":  s.docs_cccd_qr_url = url
-    elif key == "gksk":    s.docs_gksk_url = url
-    elif key == "donDeNghi": s.docs_don_de_nghi_url = url
-    elif key == "the3x4":  s.anh_the_url = url
-    elif key == "bangLaiFront": s.docs_bang_lai_front_url = url
-    elif key == "bangLaiBack":  s.docs_bang_lai_back_url = url
-    await db.commit()
-    return {"ok": True, "key": key, "url": url, "size": len(content)}
-
-
-@router.delete("/{student_id}/docs/{key}")
-async def delete_doc(
-    student_id: str,
-    key: str,
-    current_user: CurrentUser,
-    db: DB,
-    _perm: Annotated[None, Depends(require_permission("students", "update"))] = None,
-):
-    if key not in DOC_KEYS:
-        raise HTTPException(400, "invalid_key")
-    try: s_uuid = uuid.UUID(student_id)
-    except ValueError: raise HTTPException(400, "invalid_id")
-    s = await db.get(Student, s_uuid)
-    if not s: raise HTTPException(404, "student_not_found")
-    if not await _student_accessible(db, current_user, s.id):
-        raise HTTPException(403, "class_not_accessible")
-    if key == "cccd":      s.cmnd_front_url = None
-    elif key == "cccdBack": s.cmnd_back_url = None
-    elif key == "cccdQR":  s.docs_cccd_qr_url = None
-    elif key == "gksk":    s.docs_gksk_url = None
-    elif key == "donDeNghi": s.docs_don_de_nghi_url = None
-    elif key == "the3x4":  s.anh_the_url = None
-    elif key == "bangLaiFront": s.docs_bang_lai_front_url = None
-    elif key == "bangLaiBack":  s.docs_bang_lai_back_url = None
-    await db.commit()
-    return {"ok": True, "key": key}
-
-
-@router.get("/{student_id}/payments")
-async def get_student_payments(student_id: str, current_user: CurrentUser, db: DB):
-    """Frontend-compat alias: GET /api/students/{id}/payments returns the
-    student's full payment ledger (tuition + rental)."""
-    try: s_uuid = uuid.UUID(student_id)
-    except ValueError: raise HTTPException(400, "invalid_id")
-    # Don't leak existence of inaccessible students to non-admins.
-    if not await _student_accessible(db, current_user, s_uuid):
-        raise HTTPException(404, "not_found")
-    from app.models.payment import Payment
-    from app.utils.dates import method_to_wire
-    result = await db.execute(
-        select(Payment).where(Payment.student_id == s_uuid, Payment.deleted_at.is_(None))
-        .order_by(Payment.collected_at.desc())
-    )
-    return [{
-        "id": str(p.id), "studentId": str(p.student_id), "branchId": str(p.branch_id),
-        "amount": int(float(p.so_tien or 0)),
-        "method": method_to_wire(p.phuong_thuc.value if hasattr(p.phuong_thuc, "value") else p.phuong_thuc),
-        "bienLaiId": getattr(p, "so_bien_lai_id", None) or p.ma_giao_dich or "",
-        "kind": getattr(p, "kind", "tuition"),
-        "createdAt": iso_to_vn_datetime(p.collected_at or p.payment_date) or "",
-    } for p in result.scalars().all()]
+# Docs upload/delete + the per-student payments alias live in
+# routers/student_docs.py (kept separate to stay under the 400-line cap).

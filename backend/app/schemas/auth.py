@@ -34,6 +34,7 @@ class WireUser(BaseModel):
     active: bool
     branchIds: List[str] = Field(default_factory=list)  # branch SLUGS (CTV many-to-many)
     classIds: List[str] = Field(default_factory=list)   # class UUID strings (CTV many-to-many)
+    assignedClassId: Optional[str] = None  # guest kiosk: the class the operator runs against
 
     @classmethod
     def from_user(
@@ -67,6 +68,7 @@ class WireUser(BaseModel):
             active=u.is_active,
             branchIds=branch_ids or [],
             classIds=class_ids or [],
+            assignedClassId=str(u.assigned_class_id) if getattr(u, "assigned_class_id", None) else None,
         )
 
 

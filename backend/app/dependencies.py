@@ -54,6 +54,12 @@ def scope_to_branch(user: User) -> Optional[uuid.UUID]:
     return None if user.role == RoleName.admin else user.branch_id
 
 
+def is_guest(user: User) -> bool:
+    """Guest = single-class kiosk operator (scoped by assigned_class_id +
+    responsible_staff_id). Distinct from collaborator (M2M class assignments)."""
+    return user.role == RoleName.guest
+
+
 async def resolve_branch_slug(db: AsyncSession, user: User) -> Optional[str]:
     """Returns the slug to surface as user.branchId in the wire shape.
 
@@ -158,6 +164,12 @@ async def load_permissions(
         # CTV: fixed map — students create+read only; everything else denied.
         out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
         out["students"] = {"c": True, "r": True, "u": False, "d": False}
+        return out
+    if user.role == RoleName.guest:
+        # Guest kiosk: students create+read+update (update enables doc upload/edit);
+        # per-row ownership (responsible_staff_id) is enforced in the route handlers.
+        out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
+        out["students"] = {"c": True, "r": True, "u": True, "d": False}
         return out
     out = {res: {"c": False, "r": False, "u": False, "d": False} for res in ALL_RESOURCES}
     result = await db.execute(
