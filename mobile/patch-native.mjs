@@ -36,6 +36,16 @@ for (const [key, val] of Object.entries(KEYS)) {
   xml = xml.slice(0, idx) + entry + xml.slice(idx);
   added.push(key);
 }
+
+// App Store / TestFlight: declare the app uses only standard (exempt) encryption
+// (HTTPS), so uploads don't stall on the export-compliance question. The value is
+// a boolean, not a string. Harmless for ad-hoc / simulator builds.
+if (!xml.includes("<key>ITSAppUsesNonExemptEncryption</key>")) {
+  const idx = xml.lastIndexOf("</dict>");
+  xml = xml.slice(0, idx) + "\t<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>\n" + xml.slice(idx);
+  added.push("ITSAppUsesNonExemptEncryption");
+}
+
 if (added.length) {
   fs.writeFileSync(PLIST, xml);
   console.log("patch-native (iOS): added", added.join(", "));

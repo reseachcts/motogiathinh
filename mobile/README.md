@@ -61,12 +61,28 @@ npx cap open ios             # → Xcode → run, or export .ipa for Sideloadly
 photo-library usage strings are injected by **`patch-native.mjs`** (a fresh
 `cap add ios` does NOT include them — without them iOS crashes on camera access).
 
-### Signed ad-hoc IPA (CI)
-To get a signed `.ipa` installable on real (registered) devices without the App Store, run the
-**Build iOS ad-hoc IPA** GitHub Actions workflow (`.github/workflows/ios-adhoc.yml`). The one-time
-Apple setup — Developer Program, distribution certificate, ad-hoc provisioning profile, and the five
-GitHub secrets it needs — is documented step-by-step in
-[`../docs/ios-adhoc-build.md`](../docs/ios-adhoc-build.md).
+### Signed builds — ad-hoc or TestFlight (CI)
+To get a signed build onto real devices, run the **Build iOS (ad-hoc / TestFlight)** GitHub Actions
+workflow (`.github/workflows/ios-distribute.yml`) and pick a method:
+- **ad-hoc** — a `.ipa` installable on specific registered devices (UDIDs), downloaded as an artifact.
+- **testflight** — uploaded to App Store Connect / TestFlight for invite-by-email testers (no UDIDs).
+
+The one-time Apple setup (Developer Program, distribution certificate, the provisioning profile(s),
+and the GitHub secrets each method needs) is documented step-by-step in
+[`../docs/ios-distribution.md`](../docs/ios-distribution.md).
+
+### Sideload for testing — free, no Apple account (while you wait)
+No $99 Apple Developer account yet? Run the **Build iOS unsigned IPA (sideload)** workflow
+(`.github/workflows/ios-sideload.yml`) — it needs **no secrets and no Apple account**. It produces an
+**unsigned device `.ipa`**; download the `motogiathinh-ctv-ios-unsigned-ipa` artifact and install it
+with a **free Apple ID** using either:
+- **[AltStore](https://altstore.io/)** — run AltServer on a Mac/PC; it installs and auto-refreshes the app, or
+- **[Sideloadly](https://sideloadly.io/)** — plug in the device, drop in the `.ipa`, sign in with your Apple ID.
+
+Both re-sign the app with your Apple ID at install. Caveat: free-Apple-ID apps **expire after 7 days**
+and must be re-signed (AltStore can auto-refresh on the same Wi-Fi); max 3 sideloaded apps per device.
+Camera, photos, and QR scanning all work. Once your paid account is approved, switch to the signed
+ad-hoc / TestFlight paths above for longer-lived, easier distribution to other testers.
 
 ## Notes / known follow-ups
 - `src/config.js` API base is a placeholder until the backend is deployed.
