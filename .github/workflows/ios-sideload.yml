@@ -1,17 +1,5 @@
 name: Build iOS unsigned IPA (sideload) [added to main by Claude]
 
-# Builds an UNSIGNED, real-device .ipa of the Capacitor CTV app for sideloading
-# with AltStore / Sideloadly using a FREE Apple ID — NO paid Apple Developer
-# account, NO signing secrets. The sideload tool re-signs the .ipa on install,
-# so CI ships it unsigned. (Apps signed with a free Apple ID expire after 7 days
-# and must be re-signed; AltStore can auto-refresh them.)
-#
-# This is the "test on your own device while you wait for the Developer Program"
-# path. For SIGNED ad-hoc / TestFlight distribution see ios-distribute.yml.
-#
-# Native ios/ is gitignored and regenerated here via `cap add`. Manual-only to
-# keep macOS runner minutes down — run it when you want a fresh build.
-
 on:
   workflow_dispatch:
 
@@ -29,6 +17,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: DacPhu/motogiathinh
+          ref: dev
 
       - uses: actions/setup-node@v4
         with:
@@ -44,6 +35,9 @@ jobs:
           npx cap add ios
           npx cap sync ios
           node patch-native.mjs
+
+      - name: Generate app icons
+        run: npx capacitor-assets generate --ios
 
       - name: pod install
         working-directory: mobile/ios/App
@@ -76,8 +70,6 @@ jobs:
           rm -rf Payload "$RUNNER_TEMP/MotoGiaThinhCTV-unsigned.ipa"
           mkdir Payload
           cp -R "${apps[0]}" Payload/
-          # -y preserves the symlinks inside the .app bundle (frameworks) — required
-          # for a valid, re-signable .ipa.
           zip -qry "$RUNNER_TEMP/MotoGiaThinhCTV-unsigned.ipa" Payload
           ls -la "$RUNNER_TEMP"/*.ipa
 
