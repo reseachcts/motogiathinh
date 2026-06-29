@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: DacPhu/motogiathinh
-          ref: dev
+          ref: improve
 
       - uses: actions/setup-node@v4
         with:
@@ -29,10 +29,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install deps + build web bundle
-        run: |
-          npm install
-          npm run build
+      - name: Install deps
+        run: npm install
+
+      - name: Build web bundle (build.mjs → www/)
+        run: npm run build
 
       - name: Add + sync Android
         run: |
