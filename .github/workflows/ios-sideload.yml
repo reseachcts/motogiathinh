@@ -25,10 +25,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install deps + build web bundle
-        run: |
-          npm install
-          npm run build
+      - name: Install deps
+        run: npm install
+
+      - name: Build web bundle (build.mjs → www/)
+        run: npm run build
 
       - name: Add + sync iOS + patch Info.plist
         run: |
